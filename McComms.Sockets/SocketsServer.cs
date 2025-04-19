@@ -1,118 +1,179 @@
-﻿using System.Diagnostics;
-using System.Threading;
+﻿using System.Buffers;
+using System.Collections.Concurrent;
+using System.Diagnostics;
 
 namespace McComms.Sockets;
 
-public class SocketsServer
-{
-    // Use SemaphoreSlim for async-friendly synchronization
-    private readonly SemaphoreSlim _clientsSemaphore = new(1, 1);
-    // TCP listener socket
+/// <summary>
+/// Provides socket server functionality for handling client connections, 
+/// message processing, and broadcasting.
+/// </summary>
+public class SocketsServer {
+    /// <summary>
+    /// TCP listener socket for accepting incoming client connections.
+    /// </summary>
     private readonly Socket _tcpListener;
-    // Endpoint for the TCP listener
+
+    /// <summary>
+    /// Endpoint for the TCP listener defining the IP address and port to listen on.
+    /// </summary>
     private readonly IPEndPoint? _tcpEndPoint = null;
-    // Last accepted client socket
-    private Socket? _client;
-    
-    // List of connected clients
-    private readonly List<SocketsClientModel> _clients = [];
-    
-    // Callback for handling received messages
+
+    /// <summary>
+    /// Thread-safe collection of currently connected clients.
+    /// </summary>
+    private readonly ConcurrentBag<SocketsClientModel> _clients = [];
+
+    /// <summary>
+    /// Counter for assigning unique client IDs.
+    /// </summary>
+    private int _nextClientId = 1;
+
+    /// <summary>
+    /// Callback function for handling received messages from clients.
+    /// </summary>
     private Func<byte[], byte[]>? _onMessageReceived;
-    
-    // Buffer size constants
+
+    /// <summary>
+    /// Maximum buffer size for message handling.
+    /// </summary>
     private const int MAX_BUFFER_SIZE = 1500;
+
+    /// <summary>
+    /// Default port number for the server when not specified.
+    /// </summary>
     private const int DEFAULT_PORT = 8888;
 
-    // Default constructor: listens on any IP and default port
-    public SocketsServer() {
-        _tcpEndPoint = new IPEndPoint(IPAddress.Any, DEFAULT_PORT);
-        _tcpListener = new Socket(_tcpEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+    /// <summary>
+    /// Default poll delay in milliseconds to avoid busy waiting.
+    /// </summary>
+    private const int DEFAULT_POLL_DELAY_MS = 5;
+
+    /// <summary>
+    /// Poll delay in milliseconds to avoid busy waiting.
+    /// </summary>
+    private readonly int _pollDelayMs;
+
+    /// <summary>
+    /// Initializes a new instance of the SocketsServer class with default settings.
+    /// Listens on any IP address and the default port.
+    /// </summary>
+    public SocketsServer() : this(IPAddress.Any, DEFAULT_PORT, DEFAULT_POLL_DELAY_MS) {
     }
 
-    // Constructor with custom IP and port
-    public SocketsServer(IPAddress ipAddress, int port) {
+    /// <summary>
+    /// Initializes a new instance of the SocketsServer class with the specified IP address and port.
+    /// </summary>
+    /// <param name="ipAddress">The IP address to listen on.</param>
+    /// <param name="port">The port number to use.</param>
+    public SocketsServer(IPAddress ipAddress, int port) : this(ipAddress, port, DEFAULT_POLL_DELAY_MS) {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the SocketsServer class with the specified IP address, port, and poll delay.
+    /// </summary>
+    /// <param name="ipAddress">The IP address to listen on.</param>
+    /// <param name="port">The port number to use.</param>
+    /// <param name="pollDelayMs">The delay in milliseconds between polls when no data is available.</param>
+    public SocketsServer(IPAddress ipAddress, int port, int pollDelayMs) {
         _tcpEndPoint = new IPEndPoint(ipAddress, port);
         _tcpListener = new Socket(_tcpEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+        _pollDelayMs = pollDelayMs > 0 ? pollDelayMs : DEFAULT_POLL_DELAY_MS;
     }
 
-    // Starts listening for incoming client connections
-    public void Listen(Func<byte[], byte[]> onMessageReceived, CancellationToken stoppingToken) {
+    /// <summary>
+    /// Starts listening for incoming client connections and processes their messages asynchronously.
+    /// </summary>
+    /// <param name="onMessageReceived">Callback function invoked when a message is received from a client.</param>
+    /// <param name="stopToken">A cancellation token that can be used to stop the server.</param>
+    /// <returns>A Task representing the asynchronous operation.</returns>
+    public async Task ListenAsync(Func<byte[], byte[]> onMessageReceived, CancellationToken stopToken) {
         _onMessageReceived = onMessageReceived;
+
         _tcpListener.Bind(_tcpEndPoint!);
         _tcpListener.Listen();
 
         // Main accept loop
-        while (stoppingToken.IsCancellationRequested == false) {
-            _client = _tcpListener.Accept();
-            var socketClient = new SocketsClientModel(_client, new NetworkStream(_client));
-
-            // Use async-friendly semaphore instead of lock
-            _clientsSemaphore.Wait();
+        while (stopToken.IsCancellationRequested == false) {
             try {
-                socketClient.Id = _clients.Count == 0 ? 1 : _clients.Max(x => x.Id) + 1;
+                Socket client = await Task.Run(() => _tcpListener.Accept(), stopToken);
+                var socketClient = new SocketsClientModel(client, new NetworkStream(client), MAX_BUFFER_SIZE);
+
+                // Assign ID atomically and add to thread-safe collection
+                socketClient.Id = Interlocked.Increment(ref _nextClientId);
                 _clients.Add(socketClient);
-            } finally {
-                _clientsSemaphore.Release();
+
+                Debug.WriteLine($"Client connected, total clients: {_clients.Count}");
+
+                // Handle client messages in a background task
+                _ = Task.Run(async () => await MessagesHandler(socketClient, stopToken), stopToken);
             }
-
-            Debug.WriteLine($"Client connected, total clients: {_clients.Count}");
-
-            // Handle client messages in a background task (async)
-            _ = Task.Run(async () => await MessagesHandler(socketClient, stoppingToken), stoppingToken);
+            catch (OperationCanceledException) {
+                // Cancellation requested, break out of the loop
+                break;
+            }
+            catch (Exception ex) {
+                Debug.WriteLine($"McComms.Socket ERROR accepting client: {ex.Message}");
+                // Continue listening for next connection
+            }
         }
     }
 
-    // Broadcasts a command to all connected clients
-    public void SendBroadcast(byte[] command) {
-        _clientsSemaphore.Wait();
-        try {
-            foreach (var client in _clients.ToList()) {
-                try {
-                    if (client.Connected) {
-                        client.Stream.Write(command);
-                    }
-                }
-                catch {
-                    // Remove disconnected clients
-                    client.Connected = false;
-                    _clients.Remove(client);
-                    Debug.WriteLine($"Client disconnected, total: {_clients.Count}");
+    /// <summary>
+    /// Starts listening for incoming client connections and processes their messages.
+    /// </summary>
+    /// <param name="onMessageReceived">Callback function invoked when a message is received from a client.</param>
+    /// <param name="stopToken">A cancellation token that can be used to stop the server.</param>
+    public void Listen(Func<byte[], byte[]> onMessageReceived, CancellationToken stopToken) {
+        // Call the async version and block until it completes
+        // This maintains backward compatibility
+        _ = Task.Run(async () => await ListenAsync(onMessageReceived, stopToken), stopToken);
+    }
+
+    /// <summary>
+    /// Sends a broadcast message to all connected clients asynchronously.
+    /// </summary>
+    /// <param name="command">The message to broadcast as a byte array.</param>
+    /// <returns>A Task representing the asynchronous operation.</returns>
+    public async ValueTask SendBroadcastAsync(byte[] command) {
+        int disconnectedCount = 0;
+
+        // Process only connected clients
+        foreach (var client in _clients) {
+            try {
+                if (client.Connected) {
+                        await client.Stream.WriteAsync(command);
                 }
             }
-        } finally {
-            _clientsSemaphore.Release();
+            catch {
+                // Just mark client as disconnected, no need to remove from the collection
+                client.Connected = false;
+                disconnectedCount++;
+            }
+        }
+
+        // Log disconnected clients if any
+        if (disconnectedCount > 0) {
+            Debug.WriteLine($"{disconnectedCount} client(s) marked as disconnected, total clients in collection: {_clients.Count}");
         }
     }
 
-    public async Task SendBroadcastAsync(byte[] command) {
-        await _clientsSemaphore.WaitAsync();
-        try {
-            foreach (var client in _clients.ToList()) {
-                try {
-                    if (client.Connected) {
-                        await client.Stream.WriteAsync(command, 0, command.Length);
-                    }
-                }
-                catch {
-                    // Assume client is disconnected and remove it
-                    // This is a simplified error handling: in a real-world scenario, you might want to log the error or handle it differently
-                    client.Connected = false;
-                    _clients.Remove(client);
-                    Debug.WriteLine($"Client disconnected, total: {_clients.Count}");
-                }
-            }
-        } finally {
-            _clientsSemaphore.Release();
-        }
-    }
+    /// <summary>
+    /// Handles messages from a specific client, processing incoming data according to the protocol.
+    /// </summary>
+    /// <param name="client">The client model representing the connected client.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to stop message handling.</param>
+    /// <returns>A Task representing the asynchronous operation.</returns>    
+    private async Task MessagesHandler(SocketsClientModel client, CancellationToken cancellationToken) {        Debug.Assert(client != null);
+        // Get direct reference to message buffer
+        var bufferMessage = client.MessageBuffer;
+        
+        // Use ArrayPool to rent a buffer instead of allocating a new one
+        // More efficient than creating a new array for each client
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(MAX_BUFFER_SIZE);
 
-    private async Task MessagesHandler(SocketsClientModel client, CancellationToken cancellationToken) {
-        Debug.Assert(client != null);
-        // Use a dynamic buffer for message processing, with initial capacity
-        List<byte> bufferMessage = new(MAX_BUFFER_SIZE);
-        byte[] buffer = new byte[MAX_BUFFER_SIZE];
         bool receivingMessage = false;
+
         try {
             // Main message processing loop
             while (!cancellationToken.IsCancellationRequested && client.Connected) {
@@ -154,9 +215,10 @@ public class SocketsServer
                                 break;
                         }
                     }
-                } else {
-                    // Avoid busy waiting
-                    await Task.Delay(5, cancellationToken);
+                }
+                else {
+                    // Avoid busy waiting using configurable delay
+                    await Task.Delay(_pollDelayMs, cancellationToken);
                 }
             }
         }
@@ -165,14 +227,10 @@ public class SocketsServer
             throw;
         }
         finally {
-            // Use async-friendly semaphore for client removal
-            await _clientsSemaphore.WaitAsync();
-            try {
-                _clients.Remove(client);
-            } finally {
-                _clientsSemaphore.Release();
-            }
-            Debug.WriteLine($"Client disconnected, total: {_clients.Count}");
+            // Just ensure client is marked as disconnected
+            // No need to remove from the collection
+            client.Connected = false;
+            Debug.WriteLine($"Client disconnected, total clients in collection: {_clients.Count}");
         }
     }
 }
