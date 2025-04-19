@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFrameworks>net8.0;net9.0</TargetFrameworks>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<Description>Communications client/server for Sockets and gRPC</Description>
+		<Copyright>Joan Magnet</Copyright>
+		<Authors>Joan Magnet</Authors>
+		<Title>Communications client/server</Title>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+		<PackageOutputPath>..\Packages</PackageOutputPath>
+		<Version>1.0.0</Version>
+		<LanguageVersion>preview</LanguageVersion>
+	</PropertyGroup>
+
+  <ItemGroup>
+    <None Include="Readme.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+</Project>

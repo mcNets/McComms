@@ -1,0 +1,45 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFrameworks>net8.0;net9.0</TargetFrameworks>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<Description>gRPC implementation for McComms</Description>
+		<Copyright>Joan Magnet</Copyright>
+		<Authors>Joan Magnet</Authors>
+		<Title>gRPC implementation for McComms</Title>
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageOutputPath>..\Packages</PackageOutputPath>
+		<PackageReadmeFile>Readme.md</PackageReadmeFile>
+		<Version>1.0.0</Version>
+		<LanguageVersion>preview</LanguageVersion>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <Folder Include="Proto\" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Protobuf Include="Proto\commands.proto" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Grpc" Version="2.46.6" />
+		<PackageReference Include="Google.Protobuf" Version="3.29.3" />
+		<PackageReference Include="Grpc.Net.Client" Version="2.67.0" />
+		<PackageReference Include="Grpc.Tools" Version="2.70.0">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+	</ItemGroup>
+
+	<ItemGroup>
+    <None Include="Readme.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\McComms.Core\McComms.Core.csproj" />
+	</ItemGroup>
+
+</Project>

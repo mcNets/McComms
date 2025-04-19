@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+package commsproto;
+
+service mcServeis {
+	rpc SendCommand(mcCommandRequest) returns (mcCommandResponse);
+	rpc Broadcast(stream google.protobuf.Empty) returns (stream mcBroadcast);
+}
+
+message mcCommandRequest {
+  int32 id = 1;
+  string content = 2;
+}
+
+message mcCommandResponse {
+  bool succes = 1;
+  string id = 2;
+  string message = 3;
+}
+
+message mcBroadcast {
+  int32 id = 1;
+  string content = 2;
+}

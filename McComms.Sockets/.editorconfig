@@ -1,0 +1,6 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+root = true
+
+[*.cs]
+csharp_new_line_before_open_brace = none
