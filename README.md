@@ -1,36 +1,36 @@
 # McComms - Flexible Communications Library
 
-McComms és una biblioteca de comunicacions flexible que proporciona implementacions de client i servidor utilitzant diferents tecnologies de comunicació.
+McComms is a flexible communications library that provides client and server implementations using different communication technologies.
 
-## Visió general
+## Overview
 
-McComms està dissenyat per oferir una interfície comú per a comunicacions client-servidor, permetent diferents implementacions subjacents. Actualment, es suporten les següents tecnologies:
+McComms is designed to offer a common interface for client-server communications, allowing different underlying implementations. Currently, the following technologies are supported:
 
-- **Sockets TCP/IP** - Implementació de comunicacions basada en sockets
-- **gRPC** - Implementació de comunicacions basada en gRPC
+- **TCP/IP Sockets** - Socket-based communications implementation
+- **gRPC** - gRPC-based communications implementation
 
-La biblioteca està estructurada per permetre una fàcil substitució de la tecnologia de comunicació sense canviar el codi de l'aplicació principal.
+The library is structured to allow easy substitution of the communication technology without changing the main application code.
 
-## Estructura del projecte
+## Project Structure
 
-El projecte està organitzat en els següents mòduls:
+The project is organized into the following modules:
 
-- **McComms.Core** - Defineix les interfícies i classes bases comunes
-- **McComms.Sockets** - Implementació basada en sockets TCP/IP
-- **McComms.gRPC** - Implementació basada en gRPC
-- **McComms.Core.Tests** - Tests unitaris per al nucli de la biblioteca
+- **McComms.Core** - Defines common interfaces and base classes
+- **McComms.Sockets** - TCP/IP sockets based implementation
+- **McComms.gRPC** - gRPC based implementation
+- **McComms.Core.Tests** - Unit tests for the library core
 
-## Característiques principals
+## Main Features
 
-- Interfície unificada per a diferents tecnologies de comunicació
-- Suport per a operacions síncrones i asíncrones
-- Gestió de comunicacions client-servidor
-- Suport per a missatges de broadcast
-- Codificació i descodificació de missatges
+- Unified interface for different communication technologies
+- Support for both synchronous and asynchronous operations
+- Client-server communications management
+- Support for broadcast messages
+- Message encoding and decoding
 
-## Instal·lació
+## Installation
 
-El projecte està disponible com a paquets NuGet:
+The project is available as NuGet packages:
 
 ```
 Install-Package McComms.Core
@@ -38,72 +38,72 @@ Install-Package McComms.Sockets
 Install-Package McComms.gRPC
 ```
 
-## Ús bàsic
+## Basic Usage
 
 ### Client
 
 ```csharp
-// Crear un client utilitzant sockets
+// Create a client using sockets
 var client = new CommsClientSockets();
 
-// Connectar amb el servidor
+// Connect to the server
 client.Connect(message => {
-    Console.WriteLine($"Broadcast rebut: {message}");
+    Console.WriteLine($"Broadcast received: {message}");
 });
 
-// Enviar una comanda i rebre resposta
-var response = client.SendCommand(new CommandRequest("COMANDA", "paràmetres"));
+// Send a command and get a response
+var response = client.SendCommand(new CommandRequest("COMMAND", "parameters"));
 
-// O utilitzant async/await
-var response = await client.SendCommandAsync(new CommandRequest("COMANDA", "paràmetres"));
+// Or using async/await
+var response = await client.SendCommandAsync(new CommandRequest("COMMAND", "parameters"));
 
-// Desconnectar
+// Disconnect
 client.Disconnect();
 ```
 
-### Servidor
+### Server
 
 ```csharp
-// Crear un servidor utilitzant sockets
+// Create a server using sockets
 var server = new CommsServerSockets();
 
-// Registrar gestors de comandes
-server.RegisterCommandHandler("COMANDA", (request) => {
+// Register command handlers
+server.RegisterCommandHandler("COMMAND", (request) => {
     return new CommandResponse("OK");
 });
 
-// Iniciar el servidor
+// Start the server
 server.Start();
 
-// Enviar un missatge de broadcast a tots els clients
-server.Broadcast(new BroadcastMessage("INFO", "Missatge per tots els clients"));
+// Send a broadcast message to all clients
+server.Broadcast(new BroadcastMessage("INFO", "Message for all clients"));
 
-// Aturar el servidor
+// Stop the server
 server.Stop();
 ```
 
-## Suport per operacions síncrones i asíncrones
+## Support for Synchronous and Asynchronous Operations
 
-Totes les operacions principals admeten tant versions síncrones com asíncrones, permetent-te escollir l'enfocament que millor s'adapti als teus requisits:
+All main operations support both synchronous and asynchronous versions, allowing you to choose the approach that best suits your requirements:
 
 ```csharp
-// Versió síncrona
-var response = client.SendCommand(new CommandRequest("COMANDA", "dades"));
+// Synchronous version
+var response = client.SendCommand(new CommandRequest("COMMAND", "data"));
 
-// Versió asíncrona
-var response = await client.SendCommandAsync(new CommandRequest("COMANDA", "dades"));
+// Asynchronous version
+var response = await client.SendCommandAsync(new CommandRequest("COMMAND", "data"));
 ```
 
-## Contribució
+## Contribution
 
-Les contribucions són benvingudes! Si desitges contribuir a McComms, sisplau:
+Contributions are welcome! If you wish to contribute to McComms, please:
 
-1. Fes un fork del repositori
-2. Crea una branca per la teva característica (`git checkout -b caracteristica/nova-funcionalitat`)
-3. Fes commit dels teus canvis (`git commit -am 'Afegir nova funcionalitat'`)
-4. Fes push a la branca (`git push origin caracteristica/nova-funcionalitat`)
-5. Crea un Pull Request
+1. Fork the repository
+2. Create a branch for your feature (`git checkout -b feature/new-feature`)
+3. Commit your changes (`git commit -am 'Add new feature'`)
+4. Push to the branch (`git push origin feature/new-feature`)
+5. Create a Pull Request
 
-## Llicència
+## License
 
-Aquest projecte està llicenciat sota la llicència MIT. Consulta el fitxer LICENSE per més detalls.
+This project is licensed under the MIT License. See the LICENSE file for details.
