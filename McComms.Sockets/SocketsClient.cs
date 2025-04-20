@@ -1,13 +1,10 @@
-﻿using System.Threading.Tasks;
-
-namespace McComms.Sockets;
+﻿namespace McComms.Sockets;
 
 /// <summary>
 /// SocketsClient provides a TCP client for sending and receiving framed messages asynchronously.
 /// Handles connection, message sending, and background message listening.
 /// </summary>
-public class SocketsClient : IDisposable
-{
+public class SocketsClient : IDisposable {
     // Underlying TCP socket
     private readonly Socket _socket;
     // Server endpoint to connect to
@@ -16,13 +13,15 @@ public class SocketsClient : IDisposable
     private NetworkStream? _stream;
     // Buffer size constants
     private const int MAX_BUFFER_SIZE = 1500;
-    private const int MAX_BUFFER_SIZE_MESSAGE = MAX_BUFFER_SIZE + 200;
     private const int DEFAULT_PORT = 8888;
-    // Buffers for sending/receiving data
-    private readonly byte[] _sendBuffer = new byte[MAX_BUFFER_SIZE];
-    private readonly byte[] _sendBufferMessage = new byte[MAX_BUFFER_SIZE_MESSAGE];
+    // Default poll delay in milliseconds to avoid busy waiting
+    private const int DEFAULT_POLL_DELAY_MS = 5;
+    // Poll delay in milliseconds to avoid busy waiting
+    private readonly int _pollDelayMs;
     // ManualResetEvent for synchronizing broadcast message handling
-    private static readonly ManualResetEvent _broadcastSignal = new(true);
+    private static readonly SemaphoreSlim _broadcastSemaphore = new(1, 1);
+    // Flag to indicate if a message is being sent
+    private volatile bool _isSending = false;
 
     /// <summary>
     /// Callback invoked when a message is received from the server.
@@ -36,16 +35,25 @@ public class SocketsClient : IDisposable
     /// <summary>
     /// Default constructor. Connects to localhost and default port.
     /// </summary>
-    public SocketsClient() {
-        _endPoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), DEFAULT_PORT);
-        _socket = new Socket(_endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+    public SocketsClient() : this(IPAddress.Parse("127.0.0.1"), DEFAULT_PORT, DEFAULT_POLL_DELAY_MS) {
     }
+
     /// <summary>
     /// Constructor with custom host and port.
     /// </summary>
-    public SocketsClient(IPAddress host, int port) {
+    public SocketsClient(IPAddress host, int port) : this(host, port, DEFAULT_POLL_DELAY_MS) {
+    }
+
+    /// <summary>
+    /// Constructor with custom host, port, and poll delay.
+    /// </summary>
+    /// <param name="host">IP address of the host to connect to</param>
+    /// <param name="port">Port number to use</param>
+    /// <param name="pollDelayMs">Delay in milliseconds between polls when no data is available</param>
+    public SocketsClient(IPAddress host, int port, int pollDelayMs) {
         _endPoint = new IPEndPoint(host, port);
         _socket = new Socket(_endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+        _pollDelayMs = pollDelayMs > 0 ? pollDelayMs : DEFAULT_POLL_DELAY_MS;
     }
 
     /// <summary>
@@ -56,18 +64,27 @@ public class SocketsClient : IDisposable
     public async Task<bool> ConnectAsync(Action<byte[]> onMessageReceived) {
         // Set the callback for received messages
         OnMessageReceived = onMessageReceived;
-        // Connect to the server endpoint
-        _socket.Connect(_endPoint);
-        if (_socket.Connected == false) {
-            throw new Exception("Cannot connect to the server.");
+
+        try {
+            // Connect to the server endpoint
+            await _socket.ConnectAsync(_endPoint);
+            if (_socket.Connected == false) {
+                throw new Exception("Cannot connect to the server.");
+            }
+
+            // Create the network stream for communication
+            _stream = new NetworkStream(_socket);
+
+            // Start the async broadcast message listener
+            _broadcastCts = new CancellationTokenSource();
+            _broadcastTask = WaitBroadcastMessageAsync(_broadcastCts.Token);
+
+            return true;
         }
-        // Create the network stream for communication
-        _stream = new NetworkStream(_socket);
-        // Start the async broadcast message listener
-        _broadcastCts = new CancellationTokenSource();
-        _broadcastTask = WaitBroadcastMessageAsync(_broadcastCts.Token);
-        await Task.Yield(); // Ensure method is truly async
-        return true;
+        catch (Exception ex) {
+            System.Diagnostics.Debug.WriteLine($"McComms.Socket ERROR connecting: {ex.Message}");
+            throw;
+        }
     }
 
     /// <summary>
@@ -76,35 +93,57 @@ public class SocketsClient : IDisposable
     public bool Connect(Action<byte[]> onMessageReceived) {
         // Set the callback for received messages
         OnMessageReceived = onMessageReceived;
-        // Connect to the server endpoint
-        _socket.Connect(_endPoint);
-        if (_socket.Connected == false) {
-            throw new Exception("Cannot connect to the server.");
+
+        try {
+            // Connect to the server endpoint
+            _socket.Connect(_endPoint);
+            if (_socket.Connected == false) {
+                throw new Exception("Cannot connect to the server.");
+            }
+
+            // Create the network stream for communication
+            _stream = new NetworkStream(_socket);
+
+            // Start the async broadcast message listener
+            _broadcastCts = new CancellationTokenSource();
+            _broadcastTask = WaitBroadcastMessageAsync(_broadcastCts.Token);
+
+            return true;
         }
-        // Create the network stream for communication
-        _stream = new NetworkStream(_socket);
-        // Start the async broadcast message listener
-        _broadcastCts = new CancellationTokenSource();
-        _broadcastTask = WaitBroadcastMessageAsync(_broadcastCts.Token);
-        return true;
+        catch (Exception ex) {
+            System.Diagnostics.Debug.WriteLine($"McComms.Socket ERROR connecting: {ex.Message}");
+            throw;
+        }
     }
 
     /// <summary>
     /// Disconnects from the server and stops background message listening.
     /// </summary>
     public void Disconnect() {
-        // Signal the async broadcast task to cancel and exit
-        _broadcastSignal.Set();
-        _broadcastCts?.Cancel();
-        // Disconnect and close the socket if connected
-        if (_socket is not null && _socket.Connected) {
-            _socket?.Disconnect(false);
-            _socket?.Close();
+        try {
+            // Signal the async broadcast task to cancel and exit
+            _broadcastCts?.Cancel();
+
+            // Disconnect and close the socket if connected
+            if (_socket is not null && _socket.Connected) {
+                _socket?.Disconnect(false);
+                _socket?.Close();
+            }
+
+            // Wait for the broadcast task to finish with a reasonable timeout
+            if (_broadcastTask is not null && !_broadcastTask.IsCompleted) {
+                try {
+                    _broadcastTask.Wait(TimeSpan.FromSeconds(1));
+                }
+                catch (OperationCanceledException) { /* Expected during cancellation */
+                }
+                catch (Exception ex) {
+                    System.Diagnostics.Debug.WriteLine($"Error waiting for broadcast task: {ex.Message}");
+                }
+            }
         }
-        _socket?.Dispose();
-        // Wait for the broadcast task to finish
-        if (_broadcastTask is not null) {
-            try { _broadcastTask.Wait(); } catch { /* ignore */ }
+        catch (Exception ex) {
+            System.Diagnostics.Debug.WriteLine($"McComms.Socket ERROR disconnecting: {ex.Message}");
         }
     }
 
@@ -117,100 +156,72 @@ public class SocketsClient : IDisposable
         if (_socket?.Connected == false) {
             throw new Exception("Socket not connected");
         }
+
         if (message.Length == 0) {
             throw new Exception("Message is empty");
         }
+
+        // Check if the message is properly framed with STX and ETX
         if (message[0] != SocketsHelper.STX || message[^1] != SocketsHelper.ETX) {
             throw new Exception("Message is not properly framed. Expected: [STX] + Message + [ETX]");
         }
 
-        int posBuffer = -1;
+        try {
+            // Set sending flag and acquire semaphore to prevent conflicts with broadcast receiving
+            _isSending = true;
+            _broadcastSemaphore.Wait();
 
-        _broadcastSignal.Reset();
+            // Send the message
+            _stream!.Write(message);
 
-        // send the message
-        _stream!.Write(message);
+            // Get a buffer from the ArrayPool
+            byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(MAX_BUFFER_SIZE);
+            List<byte> responseBuffer = new(MAX_BUFFER_SIZE);
 
-        // wait for the response
-        bool hasResponse = false;
-        while (hasResponse == false) {
             try {
-                var bytesRead = _stream.Read(_sendBuffer);
-                if (bytesRead == 0) {
-                    throw new Exception("No data received");
-                }
+                // Wait for the response
+                bool hasResponse = false;
+                int posBuffer = -1;
 
-                for (int x = 0; x < bytesRead; x++) {
-                    if (_sendBuffer[x] == SocketsHelper.STX) {
-                        posBuffer = 0;
-                        continue;
-                    }
-                    else if (_sendBuffer[x] == SocketsHelper.ETX && posBuffer > 0) {
-                        hasResponse = true;
-                        break;
-                    }
-                    else if (posBuffer >= 0 && posBuffer < MAX_BUFFER_SIZE_MESSAGE) {
-                        _sendBufferMessage[posBuffer++] = _sendBuffer[x];
-                    }
-                    else {
-                        throw new Exception($"PosBuffer out of range (0-{MAX_BUFFER_SIZE_MESSAGE})");
-                    }
-                }
-            }
-            catch {
-                throw;
-            }
-        }
-
-        byte[] msg = new byte[posBuffer];
-        _sendBufferMessage[..posBuffer].CopyTo(msg, 0);
-        _broadcastSignal?.Set();
-        return msg;
-    }
-
-    /// <summary>
-    /// Asynchronously listens for broadcast messages from the server and invokes the callback.
-    /// </summary>
-    public async Task WaitBroadcastMessageAsync(CancellationToken cancellationToken = default) {
-        byte[] _broadcastBuffer = new byte[MAX_BUFFER_SIZE];
-        List<byte> _broadcastBufferMessage = new(MAX_BUFFER_SIZE);
-        int posBuffer = 0;
-        while (_socket.Connected && !cancellationToken.IsCancellationRequested) {
-            _broadcastSignal.WaitOne();
-            if (_stream!.DataAvailable) {
-                try {
-                    var bytesRead = await _stream.ReadAsync(_broadcastBuffer, cancellationToken);
+                while (hasResponse == false) {
+                    var bytesRead = _stream.Read(buffer, 0, buffer.Length);
                     if (bytesRead == 0) {
                         throw new Exception("No data received");
                     }
+
                     for (int x = 0; x < bytesRead; x++) {
-                        if (_broadcastBuffer[x] == SocketsHelper.STX) {
+                        if (buffer[x] == SocketsHelper.STX) {
                             posBuffer = 0;
-                            _broadcastBufferMessage.Clear();
+                            responseBuffer.Clear();
                             continue;
                         }
-                        else if (_broadcastBuffer[x] == SocketsHelper.ETX && posBuffer > 0) {
-                            var msg = _broadcastBufferMessage.ToArray();
-                            OnMessageReceived?.Invoke(msg);
-                            posBuffer = -1;
-                            _broadcastBufferMessage.Clear();
+                        else if (buffer[x] == SocketsHelper.ETX && posBuffer > 0) {
+                            hasResponse = true;
                             break;
                         }
                         else if (posBuffer >= 0) {
-                            _broadcastBufferMessage.Add(_broadcastBuffer[x]);
+                            responseBuffer.Add(buffer[x]);
                             posBuffer++;
-                        }
-                        else {
-                            throw new Exception($"PosBuffer out of range (0-{MAX_BUFFER_SIZE})");
                         }
                     }
                 }
-                catch {
-                    throw;
-                }
-            } else {
-                await Task.Delay(5, cancellationToken);
+
+                // Create the result array
+                return responseBuffer.ToArray();
             }
+            finally {
+                // Return the buffer to the pool to avoid memory leaks
+                System.Buffers.ArrayPool<byte>.Shared.Return(buffer);
+            }
+        }
+        catch (Exception ex) {
+            System.Diagnostics.Debug.WriteLine($"McComms.Socket ERROR sending message: {ex.Message}");
+            throw;
+        }
+        finally {
+            // Reset sending flag and release semaphore
+            _isSending = false;
+            _broadcastSemaphore.Release();
         }
     }
 
@@ -231,44 +242,143 @@ public class SocketsClient : IDisposable
             throw new Exception("Message is not properly framed. Expected: [STX] + Message + [ETX]");
         }
 
-        int posBuffer = -1;
-        _broadcastSignal.Reset();
-        // send the message
-        await _stream!.WriteAsync(message, cancellationToken);
-        // wait for the response
-        bool hasResponse = false;
-        List<byte> responseBuffer = new(MAX_BUFFER_SIZE);
-        while (!hasResponse && !cancellationToken.IsCancellationRequested) {
+        try {
+            // Set sending flag and acquire semaphore
+            _isSending = true;
+            await _broadcastSemaphore.WaitAsync(cancellationToken);
+
+            // Send the message
+            await _stream!.WriteAsync(message, cancellationToken);
+
+            // Get a buffer from the ArrayPool
+            byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(MAX_BUFFER_SIZE);
+            List<byte> responseBuffer = new(MAX_BUFFER_SIZE);
+
             try {
-                var bytesRead = await _stream.ReadAsync(_sendBuffer, cancellationToken);
-                if (bytesRead == 0) {
-                    throw new Exception("No data received");
+                // Wait for the response
+                bool hasResponse = false;
+                int posBuffer = -1;
+
+                while (!hasResponse && !cancellationToken.IsCancellationRequested) {
+                    var bytesRead = await _stream.ReadAsync(buffer, cancellationToken);
+                    if (bytesRead == 0) {
+                        throw new Exception("No data received");
+                    }
+
+                    for (int x = 0; x < bytesRead; x++) {
+                        if (buffer[x] == SocketsHelper.STX) {
+                            posBuffer = 0;
+                            responseBuffer.Clear();
+                            continue;
+                        }
+                        else if (buffer[x] == SocketsHelper.ETX && posBuffer > 0) {
+                            hasResponse = true;
+                            break;
+                        }
+                        else if (posBuffer >= 0) {
+                            responseBuffer.Add(buffer[x]);
+                            posBuffer++;
+                        }
+                    }
                 }
-                for (int x = 0; x < bytesRead; x++) {
-                    if (_sendBuffer[x] == SocketsHelper.STX) {
-                        posBuffer = 0;
-                        responseBuffer.Clear();
-                        continue;
-                    }
-                    else if (_sendBuffer[x] == SocketsHelper.ETX && posBuffer > 0) {
-                        hasResponse = true;
-                        break;
-                    }
-                    else if (posBuffer >= 0) {
-                        responseBuffer.Add(_sendBuffer[x]);
-                        posBuffer++;
-                    }
-                    else {
-                        throw new Exception($"PosBuffer out of range (0-{MAX_BUFFER_SIZE})");
-                    }
-                }
+
+                // Create the result array
+                return responseBuffer.ToArray();
             }
-            catch {
-                throw;
+            finally {
+                // Return the buffer to the pool
+                System.Buffers.ArrayPool<byte>.Shared.Return(buffer);
             }
         }
-        _broadcastSignal?.Set();
-        return responseBuffer.ToArray();
+        catch (OperationCanceledException) {
+            System.Diagnostics.Debug.WriteLine("McComms.Socket: Operation was cancelled");
+            throw;
+        }
+        catch (Exception ex) {
+            System.Diagnostics.Debug.WriteLine($"McComms.Socket ERROR sending message asynchronously: {ex.Message}");
+            throw;
+        }
+        finally {
+            // Reset sending flag and release semaphore
+            _isSending = false;
+            _broadcastSemaphore.Release();
+        }
+    }
+
+    /// <summary>
+    /// Asynchronously listens for broadcast messages from the server and invokes the callback.
+    /// </summary>
+    public async Task WaitBroadcastMessageAsync(CancellationToken cancellationToken = default) {
+        // Rent buffer from ArrayPool for better memory efficiency
+        byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(MAX_BUFFER_SIZE);
+        List<byte> messageBuffer = new(MAX_BUFFER_SIZE);
+
+        try {
+            int posBuffer = -1;
+            bool receivingMessage = false;
+
+            while (_socket.Connected && !cancellationToken.IsCancellationRequested) {
+                // Skip processing if we're currently sending a message
+                if (_isSending) {
+                    await Task.Delay(_pollDelayMs, cancellationToken);
+                    continue;
+                }
+
+                // Try to acquire the semaphore to prevent conflicts with send operations
+                if (await _broadcastSemaphore.WaitAsync(0, cancellationToken)) {
+                    try {
+                        if (_stream!.DataAvailable) {
+                            var bytesRead = await _stream.ReadAsync(buffer, cancellationToken);
+                            if (bytesRead <= 0) {
+                                continue;
+                            }
+
+                            for (int x = 0; x < bytesRead; x++) {
+                                switch (buffer[x]) {
+                                    case SocketsHelper.STX:
+                                        messageBuffer.Clear();
+                                        receivingMessage = true;
+                                        posBuffer = 0;
+                                        break;
+                                    case SocketsHelper.ETX:
+                                        if (receivingMessage && posBuffer > 0) {
+                                            var msg = messageBuffer.ToArray();
+                                            OnMessageReceived?.Invoke(msg);
+                                            receivingMessage = false;
+                                            messageBuffer.Clear();
+                                            posBuffer = -1;
+                                        }
+                                        break;
+                                    default:
+                                        if (receivingMessage) {
+                                            messageBuffer.Add(buffer[x]);
+                                            posBuffer++;
+                                        }
+                                        break;
+                                }
+                            }
+                        }
+                    }
+                    finally {
+                        _broadcastSemaphore.Release();
+                    }
+                }
+
+                // Avoid busy waiting
+                await Task.Delay(_pollDelayMs, cancellationToken);
+            }
+        }
+        catch (OperationCanceledException) {
+            // Expected during cancellation, don't need to do anything
+        }
+        catch (Exception ex) {
+            System.Diagnostics.Debug.WriteLine($"McComms.Socket ERROR in broadcast listener: {ex.Message}");
+            throw;
+        }
+        finally {
+            // Return the buffer to the pool
+            System.Buffers.ArrayPool<byte>.Shared.Return(buffer);
+        }
     }
 
     /// <summary>
@@ -276,5 +386,8 @@ public class SocketsClient : IDisposable
     /// </summary>
     public void Dispose() {
         Disconnect();
+        _broadcastSemaphore?.Dispose();
+        _broadcastCts?.Dispose();
+        _stream?.Dispose();
     }
 }
