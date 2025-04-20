@@ -8,7 +8,7 @@ namespace McComms.Sockets;
 /// Provides socket server functionality for handling client connections, 
 /// message processing, and broadcasting.
 /// </summary>
-public class SocketsServer {
+public class SocketsServer : IDisposable {
     /// <summary>
     /// TCP listener socket for accepting incoming client connections.
     /// </summary>
@@ -231,6 +231,57 @@ public class SocketsServer {
             // No need to remove from the collection
             client.Connected = false;
             Debug.WriteLine($"Client disconnected, total clients in collection: {_clients.Count}");
+        }
+    }
+
+    /// <summary>
+    /// Releases all resources used by the SocketsServer instance.
+    /// </summary>
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Releases the unmanaged resources used by the SocketsServer and optionally releases the managed resources.
+    /// </summary>
+    /// <param name="disposing">true to release both managed and unmanaged resources; false to release only unmanaged resources.</param>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            // Close the TCP listener socket
+            if (_tcpListener != null)
+            {
+                try
+                {
+                    _tcpListener.Close();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error during socket close: {ex.Message}");
+                }
+            }
+
+            // Close all client connections
+            foreach (var client in _clients)
+            {
+                try
+                {                    if (client.Connected)
+                    {
+                        client.Connected = false;
+                        client.Stream?.Close();
+                        client.ClientSocket?.Close();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error closing client connection: {ex.Message}");
+                }
+            }
+
+            _clients.Clear();
         }
     }
 }

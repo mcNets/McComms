@@ -5,9 +5,9 @@
     <Platform Name="x86" />
   </Configurations>
   <Folder Name="/Tests/">
-    <Project Path="McComms.Core.Tests/McComms.Core.Tests.csproj" />
+    <Project Path="src/tests/McComms.Core.Tests/McComms.Core.Tests.csproj" />
   </Folder>
-  <Project Path="McComms.Core/McComms.Core.csproj" />
-  <Project Path="McComms.gRPC/McComms.gRPC.csproj" />
-  <Project Path="McComms.Sockets/McComms.Sockets.csproj" />
+  <Project Path="src/McComms.Core/McComms.Core.csproj" />
+  <Project Path="src/McComms.gRPC/McComms.gRPC.csproj" />
+  <Project Path="src/McComms.Sockets/McComms.Sockets.csproj" />
 </Solution>
