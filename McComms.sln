@@ -2,13 +2,13 @@
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "McComms.Core", "McComms.Core\McComms.Core.csproj", "{51DF7C7E-F464-4E63-B6D2-C780AE9297B0}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "McComms.Core", "src/McComms.Core/McComms.Core.csproj", "{51DF7C7E-F464-4E63-B6D2-C780AE9297B0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "McComms.gRPC", "McComms.gRPC\McComms.gRPC.csproj", "{F74A17A3-A8DB-48B9-8A8A-8135AF7A09AE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "McComms.gRPC", "src/McComms.gRPC/McComms.gRPC.csproj", "{F74A17A3-A8DB-48B9-8A8A-8135AF7A09AE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "McComms.Sockets", "McComms.Sockets\McComms.Sockets.csproj", "{668E31F0-BFAF-407B-A7AD-927FF452463E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "McComms.Sockets", "src/McComms.Sockets/McComms.Sockets.csproj", "{668E31F0-BFAF-407B-A7AD-927FF452463E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "McComms.Core.Tests", "McComms.Core.Tests\McComms.Core.Tests.csproj", "{32FC12F0-1BCB-4890-A8C3-4B1F6FE17B6F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "McComms.Core.Tests", "src/tests/McComms.Core.Tests/McComms.Core.Tests.csproj", "{32FC12F0-1BCB-4890-A8C3-4B1F6FE17B6F}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
 EndProject
