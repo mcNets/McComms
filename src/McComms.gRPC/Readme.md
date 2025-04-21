@@ -1,11 +1,11 @@
 # McComms.gRPC
 
-Implementació gRPC per a la solució McComms.
+gRPC implementation for the McComms solution.
 
-## Contingut
-- Serveis gRPC
-- Clients i servidors
-- Fitxers .proto
+## Contents
+- gRPC services
+- Clients and servers
+- .proto files
 
-## Autor
+## Author
 Joan Magnet

@@ -27,7 +27,7 @@ public class SocketsHelper
     /// <param name="message">Message to encode</param>
     /// <returns>Encoded bytes array</returns>
     public static byte[] Encode(string message) {
-        // Utilitza UTF-8 per codificar el text
+        // Uses UTF-8 to encode the text
         var encoded = Encoding.UTF8.GetBytes(message);
         return Framed(encoded);
     }
@@ -35,8 +35,8 @@ public class SocketsHelper
     /// <summary>
     /// Decode a bytes array to string (without removing framing).
     /// </summary>
-    /// <param name="response">Array de bytes rebut</param>
-    /// <returns>Missatge decodificat</returns>
+    /// <param name="response">Received bytes array</param>
+    /// <returns>Decoded message</returns>
     public static string Decode(byte[] response) {
         var msg = Encoding.UTF8.GetString(response, 0, response.Length);
         return msg;
@@ -48,7 +48,7 @@ public class SocketsHelper
     /// <param name="buffer">Message to encapsulate</param>
     /// <returns>Byte array with framing</returns>
     private static byte[] Framed(byte[] buffer) {
-        // Optimitzat: utilitza Span<byte> per a millor eficiència (si cal, però aquí l'optimització és mínima)
+        // Optimized: uses Span<byte> for better efficiency (if needed, but optimization is minimal here)
         byte[] framed = new byte[buffer.Length + 2];
         framed[0] = STX;
         buffer.CopyTo(framed, 1);

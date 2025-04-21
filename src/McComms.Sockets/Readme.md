@@ -1,10 +1,10 @@
 # McComms.Sockets
 
-Implementació basada en sockets per a la solució McComms.
+Socket-based implementation for the McComms solution.
 
-## Contingut
-- Clients i servidors per sockets
-- Models i helpers específics
+## Contents
+- Socket clients and servers
+- Specific models and helpers
 
-## Autor
+## Author
 Joan Magnet
