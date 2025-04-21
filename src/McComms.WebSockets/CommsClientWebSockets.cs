@@ -1,4 +1,3 @@
-// filepath: c:\Code\McComms\src\McComms.WebSockets\CommsClientWebSockets.cs
 namespace McComms.WebSockets;
 
 /// <summary>
@@ -9,6 +8,11 @@ public class CommsClientWebSockets : ICommsClient {
     private readonly WebSocketsClient _webSocketClient;
     private Action<BroadcastMessage>? _onBroadcastReceived;
     private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
+
+    /// <summary>
+    /// Gets or sets the callback for broadcast messages received from the server.
+    /// </summary>
+    public Action<BroadcastMessage>? OnBroadcastReceived { get; set; }
 
     /// <summary>
     /// Initializes a new instance of the CommsClientWebSockets class with default server address and port.

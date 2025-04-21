@@ -3,11 +3,12 @@
     <Platform Name="Any CPU" />
     <Platform Name="x64" />
     <Platform Name="x86" />  
-  </Configurations>  
-    <Folder Name="/Tests/">
+  </Configurations>    
+  <Folder Name="/Tests/">
     <Project Path="src/tests/McComms.Core.Tests/McComms.Core.Tests.csproj" />
     <Project Path="src/tests/McComms.Sockets.Tests/McComms.Sockets.Tests.csproj" />
     <Project Path="src/tests/McComms.gRPC.Tests/McComms.gRPC.Tests.csproj" />
+    <Project Path="src/tests/McComms.WebSockets.Tests/McComms.WebSockets.Tests.csproj" />
   </Folder>
   <Project Path="src/McComms.Core/McComms.Core.csproj" />
   <Project Path="src/McComms.gRPC/McComms.gRPC.csproj" />

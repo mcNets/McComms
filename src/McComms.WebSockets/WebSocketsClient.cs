@@ -1,16 +1,19 @@
-// filepath: c:\Code\McComms\src\McComms.WebSockets\WebSocketsClient.cs
 namespace McComms.WebSockets;
 
 /// <summary>
 /// Client implementation for WebSocket communications.
 /// </summary>
-public class WebSocketsClient : IDisposable {
-    private readonly string _serverUrl;
+public class WebSocketsClient : IDisposable {    private readonly string _serverUrl;
     private ClientWebSocket? _webSocket;
     private Func<byte[], Task>? _onMessageReceived;
     private readonly CancellationTokenSource _cts = new();
     private bool _isRunning = false;
     private const int BUFFER_SIZE = 4096;
+    
+    /// <summary>
+    /// Gets a value indicating whether the client is currently connected and running.
+    /// </summary>
+    public bool IsRunning => _isRunning;
 
     /// <summary>
     /// Initializes a new WebSocketsClient with default server host and port.

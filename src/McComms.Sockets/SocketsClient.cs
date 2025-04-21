@@ -54,9 +54,7 @@ public class SocketsClient : IDisposable {
         _endPoint = new IPEndPoint(host, port);
         _socket = new Socket(_endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
         _pollDelayMs = pollDelayMs > 0 ? pollDelayMs : DEFAULT_POLL_DELAY_MS;
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// Connects to the server and starts background message listening asynchronously.
     /// </summary>
     /// <param name="onMessageReceived">Callback for received messages</param>
@@ -75,9 +73,9 @@ public class SocketsClient : IDisposable {
             // Create the network stream for communication
             _stream = new NetworkStream(_socket);
 
-            // Start the async broadcast message listener
+            // Start the async broadcast message listener in a separate thread
             _broadcastCts = new CancellationTokenSource();
-            _broadcastTask = WaitBroadcastMessageAsync(_broadcastCts.Token);
+            _broadcastTask = Task.Run(() => WaitBroadcastMessageAsync(_broadcastCts.Token));
 
             return true;
         }
@@ -85,9 +83,7 @@ public class SocketsClient : IDisposable {
             System.Diagnostics.Debug.WriteLine($"McComms.Socket ERROR connecting: {ex.Message}");
             throw;
         }
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// Connects to the server and starts background message listening (synchronous version).
     /// </summary>
     public bool Connect(Action<byte[]> onMessageReceived) {
@@ -104,9 +100,9 @@ public class SocketsClient : IDisposable {
             // Create the network stream for communication
             _stream = new NetworkStream(_socket);
 
-            // Start the async broadcast message listener
+            // Start the async broadcast message listener in a separate thread
             _broadcastCts = new CancellationTokenSource();
-            _broadcastTask = WaitBroadcastMessageAsync(_broadcastCts.Token);
+            _broadcastTask = Task.Run(() => WaitBroadcastMessageAsync(_broadcastCts.Token));
 
             return true;
         }

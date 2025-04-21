@@ -1,4 +1,3 @@
-// filepath: c:\Code\McComms\src\McComms.WebSockets\WebSocketsServer.cs
 namespace McComms.WebSockets;
 
 /// <summary>
