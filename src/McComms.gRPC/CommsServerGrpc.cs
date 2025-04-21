@@ -65,6 +65,6 @@ public class CommsServerGrpc : ICommsServer
     private mcCommandResponse OnCommandReceived(mcCommandRequest request) {
         ArgumentNullException.ThrowIfNull(CommandReceived);
         var result = CommandReceived.Invoke(new CommandRequest(request.Id, request.Content));
-        return new mcCommandResponse { Succes = result.Success, Id = result.Id, Message = result.Message };
+        return new mcCommandResponse { Success = result.Success, Id = result.Id, Message = result.Message };
     }
 }

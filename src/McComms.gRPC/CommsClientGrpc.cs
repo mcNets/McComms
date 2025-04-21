@@ -66,7 +66,7 @@ public class CommsClientGrpc : ICommsClient
     /// <returns>The server's response</returns>
     public CommandResponse SendCommand(CommandRequest msg) {
         var response = _client.SendCommand(new mcCommandRequest { Id = msg.Id, Content = msg.Message });
-        return new CommandResponse(response.Succes, response.Id, response.Message);
+        return new CommandResponse(response.Success, response.Id, response.Message);
     }
 
     /// <summary>

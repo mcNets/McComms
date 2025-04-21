@@ -55,7 +55,7 @@ public class GrpcClientTests
         var client = new GrpcClient();
         var response = client.SendCommand(new Commsproto.mcCommandRequest());
         Assert.That(response, Is.Not.Null);
-        Assert.That(response.Succes, Is.False);
+        Assert.That(response.Success, Is.False);
     }
 
     [Test]
@@ -65,6 +65,6 @@ public class GrpcClientTests
         var client = new GrpcClient();
         var response = await client.SendCommandAsync(new Commsproto.mcCommandRequest());
         Assert.That(response, Is.Not.Null);
-        Assert.That(response.Succes, Is.False);
+        Assert.That(response.Success, Is.False);
     }
 }

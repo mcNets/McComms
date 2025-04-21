@@ -193,7 +193,7 @@ public class GrpcClient : IDisposable, IAsyncDisposable {
             Debug.WriteLine($"Error sending command: {ex.Message}");
             // Return an error message if communication fails
             return new mcCommandResponse {
-                Succes = false,
+                Success = false,
                 Id = msg.Id.ToString(),
                 Message = $"Communication error: {ex.Message}"
             };
@@ -219,7 +219,7 @@ public class GrpcClient : IDisposable, IAsyncDisposable {
             Debug.WriteLine($"Error sending command asynchronously: {ex.Message}");
             // Return an error message if communication fails
             return new mcCommandResponse {
-                Succes = false,
+                Success = false,
                 Id = msg.Id.ToString(),
                 Message = $"Communication error: {ex.Message}"
             };

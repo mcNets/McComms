@@ -15,7 +15,7 @@ message mcCommandRequest {
 }
 
 message mcCommandResponse {
-  bool succes = 1;
+  bool success = 1;
   string id = 2;
   string message = 3;
 }

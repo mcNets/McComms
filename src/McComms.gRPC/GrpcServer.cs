@@ -97,7 +97,7 @@ public class GrpcServer : mcServeis.mcServeisBase
     public override Task<mcCommandResponse> SendCommand(mcCommandRequest request, ServerCallContext context) {
         ArgumentNullException.ThrowIfNull(OnCommandReceived);
         var response = OnCommandReceived.Invoke(new mcCommandRequest { Id = request.Id, Content = request.Content });
-        return Task.FromResult(new mcCommandResponse { Succes = response.Succes, Id = response.Id, Message = response.Message });
+        return Task.FromResult(new mcCommandResponse { Success = response.Success, Id = response.Id, Message = response.Message });
     }
 
     /// <summary>
