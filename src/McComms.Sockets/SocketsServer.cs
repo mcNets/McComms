@@ -37,7 +37,7 @@ public class SocketsServer : IDisposable {
     /// <summary>
     /// Maximum buffer size for message handling.
     /// </summary>
-    private const int MAX_BUFFER_SIZE = 1500;
+    private const int DEFAULT_BUFFER_SIZE = 1500;
 
     /// <summary>
     /// Default port number for the server when not specified.
@@ -96,11 +96,11 @@ public class SocketsServer : IDisposable {
         // Main accept loop
         while (stopToken.IsCancellationRequested == false) {
             try {
-                Socket client = await Task.Run(() => _tcpListener.Accept(), stopToken);
-                var socketClient = new SocketsClientModel(client, new NetworkStream(client), MAX_BUFFER_SIZE);
-
-                // Assign ID atomically and add to thread-safe collection
-                socketClient.Id = Interlocked.Increment(ref _nextClientId);
+                Socket client = await _tcpListener.AcceptAsync(stopToken);
+                var socketClient = new SocketsClientModel(client, new NetworkStream(client), DEFAULT_BUFFER_SIZE) {
+                    // Assign ID atomically and add to thread-safe collection
+                    Id = Interlocked.Increment(ref _nextClientId)
+                };
                 _clients.Add(socketClient);
 
                 Debug.WriteLine($"Client connected, total clients: {_clients.Count}");
@@ -170,7 +170,7 @@ public class SocketsServer : IDisposable {
         
         // Use ArrayPool to rent a buffer instead of allocating a new one
         // More efficient than creating a new array for each client
-        byte[] buffer = ArrayPool<byte>.Shared.Rent(MAX_BUFFER_SIZE);
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(DEFAULT_BUFFER_SIZE);
 
         bool receivingMessage = false;
 
@@ -268,8 +268,8 @@ public class SocketsServer : IDisposable {
             foreach (var client in _clients)
             {
                 try
-                {                    if (client.Connected)
-                    {
+                {
+                    if (client.Connected) {
                         client.Connected = false;
                         client.Stream?.Close();
                         client.ClientSocket?.Close();

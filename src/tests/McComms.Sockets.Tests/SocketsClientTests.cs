@@ -1,8 +1,5 @@
 using NUnit.Framework;
-using McComms.Sockets;
 using System.Net;
-using System.Net.Sockets;
-using System.Text;
 
 namespace McComms.Sockets.Tests;
 

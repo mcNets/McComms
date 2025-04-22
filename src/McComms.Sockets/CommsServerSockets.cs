@@ -24,7 +24,7 @@ public class CommsServerSockets : ICommsServer {
     }
 
     /// <summary>
-    /// Gets or sets the callback function that is invoked when a command is received.
+    /// Callback function that is invoked when a command is received.
     /// </summary>
     public Func<CommandRequest, CommandResponse>? CommandReceived { get; set; }
 
@@ -41,7 +41,9 @@ public class CommsServerSockets : ICommsServer {
     /// <summary>
     /// Stops the server and releases resources.
     /// </summary>
-    public void Stop() { }
+    public void Stop() {
+        _socketServer.Dispose();
+    }
 
     /// <summary>
     /// Sends a broadcast message to all connected clients.

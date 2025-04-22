@@ -305,4 +305,91 @@ public class IntegrationTests
         client2.Disconnect();
         server.Stop();
     }
+
+    [Test]
+    [Order(6)]
+    public async Task BroadcastDuringCommandProcessing_ClientReceivesBoth_WorksAsExpected()
+    {
+        // Arrange
+        int testPort = GetTestPort(6);
+        var server = new CommsServerSockets(LoopbackAddress, testPort);
+
+        // Prepare broadcast message
+        var broadcastMessage = new BroadcastMessage(10, "Emergency broadcast during command processing");
+        
+        // Setup broadcast message collection
+        var receivedBroadcasts = new ConcurrentBag<BroadcastMessage>();
+        
+        // Use AutoResetEvent to synchronize the test execution
+        var broadcastSent = new AutoResetEvent(false);
+        var responseReceived = new AutoResetEvent(false);
+        
+        // Start server with a command handler that sends a broadcast during processing
+        server.Start(request => 
+        {
+            server.SendBroadcast(broadcastMessage);
+            broadcastSent.Set();
+            Thread.Sleep(100);
+            return new CommandResponse(true, $"Command {request.Id} processed after broadcast");
+        }, _serverCts.Token);
+
+        // Create and connect client
+        var client = new CommsClientSockets(LoopbackAddress, testPort);
+        
+        CommandResponse? commandResponse = null;
+        
+        var connected = await client.ConnectAsync(msg => 
+        {
+            receivedBroadcasts.Add(msg);
+            // If we get the response after receiving the broadcast,
+            // signal that we can proceed with assertions
+            if (commandResponse != null)
+            {
+                responseReceived.Set();
+            }
+        });
+
+        // Assert client connected successfully
+        Assert.That(connected, Is.True, "Client failed to connect to server");
+
+        // Act - Send a command
+        var request = new CommandRequest { Id = 7, Message = "PROCESS_WITH_BROADCAST" };
+        
+        // Send command asynchronously
+        var sendTask = Task.Run(async () =>
+        {
+            commandResponse = await client.SendCommandAsync(request);
+            
+            // If we got the response after receiving the broadcast,
+            // signal that we can proceed with assertions
+            if (receivedBroadcasts.Count > 0)
+            {
+                responseReceived.Set();
+            }
+        });
+
+        // Wait for both the broadcast to be sent and response to be received
+        // or timeout after 5 seconds
+        bool broadcastWasSent = broadcastSent.WaitOne(5000);
+        bool responseWasReceived = responseReceived.WaitOne(5000);
+
+        // Assert
+        Assert.That(broadcastWasSent, Is.True, "Broadcast was not sent during command processing");
+        Assert.That(responseWasReceived, Is.True, "Response was not received after broadcast");
+        
+        // Verify command response
+        Assert.That(commandResponse, Is.Not.Null, "Command response should not be null");
+        Assert.That(commandResponse!.Success, Is.True, "Command should have succeeded");
+        Assert.That(commandResponse.Message, Is.EqualTo("Command 7 processed after broadcast"));
+        
+        // Verify broadcast was received
+        Assert.That(receivedBroadcasts, Has.Count.EqualTo(1), "Client should have received exactly one broadcast");
+        var broadcast = receivedBroadcasts.First();
+        Assert.That(broadcast.Id, Is.EqualTo(10));
+        Assert.That(broadcast.Message, Is.EqualTo("Emergency broadcast during command processing"));
+
+        // Cleanup
+        client.Disconnect();
+        server.Stop();
+    }
 }

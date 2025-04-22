@@ -54,7 +54,9 @@ public class SocketsClient : IDisposable {
         _endPoint = new IPEndPoint(host, port);
         _socket = new Socket(_endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
         _pollDelayMs = pollDelayMs > 0 ? pollDelayMs : DEFAULT_POLL_DELAY_MS;
-    }    /// <summary>
+    }
+
+    /// <summary>
     /// Connects to the server and starts background message listening asynchronously.
     /// </summary>
     /// <param name="onMessageReceived">Callback for received messages</param>
@@ -75,7 +77,7 @@ public class SocketsClient : IDisposable {
 
             // Start the async broadcast message listener in a separate thread
             _broadcastCts = new CancellationTokenSource();
-            _broadcastTask = Task.Run(() => WaitBroadcastMessageAsync(_broadcastCts.Token));
+            _broadcastTask = Task.Run(async () => await WaitBroadcastMessageAsync(_broadcastCts.Token));
 
             return true;
         }
@@ -83,7 +85,9 @@ public class SocketsClient : IDisposable {
             System.Diagnostics.Debug.WriteLine($"McComms.Socket ERROR connecting: {ex.Message}");
             throw;
         }
-    }    /// <summary>
+    }
+
+    /// <summary>
     /// Connects to the server and starts background message listening (synchronous version).
     /// </summary>
     public bool Connect(Action<byte[]> onMessageReceived) {
@@ -102,7 +106,7 @@ public class SocketsClient : IDisposable {
 
             // Start the async broadcast message listener in a separate thread
             _broadcastCts = new CancellationTokenSource();
-            _broadcastTask = Task.Run(() => WaitBroadcastMessageAsync(_broadcastCts.Token));
+            _broadcastTask = Task.Run(async () => await WaitBroadcastMessageAsync(_broadcastCts.Token));
 
             return true;
         }
@@ -164,8 +168,8 @@ public class SocketsClient : IDisposable {
 
         try {
             // Set sending flag and acquire semaphore to prevent conflicts with broadcast receiving
-            _isSending = true;
             _broadcastSemaphore.Wait();
+            _isSending = true;
 
             // Send the message
             _stream!.Write(message);
@@ -203,7 +207,7 @@ public class SocketsClient : IDisposable {
                 }
 
                 // Create the result array
-                return responseBuffer.ToArray();
+                return [.. responseBuffer];
             }
             finally {
                 // Return the buffer to the pool to avoid memory leaks
@@ -216,8 +220,8 @@ public class SocketsClient : IDisposable {
         }
         finally {
             // Reset sending flag and release semaphore
-            _isSending = false;
             _broadcastSemaphore.Release();
+            _isSending = false;
         }
     }
 
@@ -240,8 +244,8 @@ public class SocketsClient : IDisposable {
 
         try {
             // Set sending flag and acquire semaphore
-            _isSending = true;
             await _broadcastSemaphore.WaitAsync(cancellationToken);
+            _isSending = true;
 
             // Send the message
             await _stream!.WriteAsync(message, cancellationToken);
@@ -321,10 +325,10 @@ public class SocketsClient : IDisposable {
                 }
 
                 // Try to acquire the semaphore to prevent conflicts with send operations
-                if (await _broadcastSemaphore.WaitAsync(0, cancellationToken)) {
+                if (await _broadcastSemaphore.WaitAsync(0,cancellationToken)) {
                     try {
                         if (_stream!.DataAvailable) {
-                            var bytesRead = await _stream.ReadAsync(buffer, cancellationToken);
+                            var bytesRead = await _stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken);
                             if (bytesRead <= 0) {
                                 continue;
                             }
@@ -385,5 +389,6 @@ public class SocketsClient : IDisposable {
         _broadcastSemaphore?.Dispose();
         _broadcastCts?.Dispose();
         _stream?.Dispose();
+        GC.SuppressFinalize(this);
     }
 }
