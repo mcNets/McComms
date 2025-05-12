@@ -1,6 +1,6 @@
 namespace McComms.Core;
 
-public enum ProtocolType
+public enum CommsProtocol
 {
     None,
     gRPC,

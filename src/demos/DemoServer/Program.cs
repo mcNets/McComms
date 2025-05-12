@@ -1,45 +1,55 @@
-﻿using DemoServer;
-
-Console.Clear();
+﻿Console.Clear();
 Console.WriteLine("McComms Demo Server");
 
 CancellationTokenSource cts = new CancellationTokenSource();
 
-ICommsServer? commsServer = null;
- 
-Protocol server = new Protocol();
-
-switch (server.Protocol)
-{
-    case ProtocolType.gRPC:
-        //commsServer = new GrpcServer();
-        break;
-    case ProtocolType.Sockets:
-        commsServer = new CommsServerSockets();
-        break;
-    case ProtocolType.WebSockets:
-        //commsServer = new WebSocketServer();
-        break;
-}
-
-if (commsServer == null)
-{
-    Console.WriteLine("No server selected. Exiting...");
-    return;
-}
-
-Console.WriteLine($"Starting {server.Protocol} server...");
+ICommsServer? CommsServer = SelectServer();
 
 var token = cts.Token;
-commsServer.Start(OnCommandReceived, token);
+CommsServer?.Start(OnCommandReceived, token);
 
 while (token.IsCancellationRequested == false)
 {
     await Task.Delay(100, token);
 }
 
-CommandResponse OnCommandReceived(CommandRequest request)
+static CommandResponse OnCommandReceived(CommandRequest request)
 {
     Console.WriteLine($"Command received: {request}");
     return MsgHelper.Ok("OK");
+}
+
+static ICommsServer SelectServer()
+{
+    Console.WriteLine("Please select a protocol:");
+    Console.WriteLine("0. Quit");
+    Console.WriteLine("1. gRPC");
+    Console.WriteLine("2. Sockets");
+    Console.WriteLine("3. WebSockets");
+
+    while (true)
+    {
+        Console.Write("Enter your selection: ");
+
+        string? input = Console.ReadLine();
+
+        switch (input)
+        {
+            case "0":
+                Environment.Exit(0);
+                break;
+            case "1":
+                Console.WriteLine("gRPC server selected.");
+                return new CommsServerSockets();
+            case "2":
+                Console.WriteLine("Sockets server selected.");
+                return new CommsServerSockets();
+            case "3":
+                Console.WriteLine("WebSockets server selected.");
+                return new CommsServerSockets();
+            default:
+                Console.WriteLine("Invalid selection. Please try again.");
+                continue;
+        }
+    }
 }
