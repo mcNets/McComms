@@ -9,7 +9,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\..\McComms.Sockets\McComms.Sockets.csproj" />
+		<ProjectReference Include="..\..\McComms.Sockets\McComms.Sockets.csproj" />
 	</ItemGroup>
 
 </Project>
