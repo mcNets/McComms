@@ -1,5 +1,7 @@
 ﻿using McComms.Core;
+using McComms.gRPC;
 using McComms.Sockets;
+using McComms.WebSockets;
 
 Console.Clear();
 Console.WriteLine("McComms Demo Client");
@@ -72,13 +74,13 @@ static ICommsClient SelectClient()
                 break;
             case "1":
                 Console.WriteLine("gRPC selected.");
-                return new CommsClientSockets();
+                return new CommsClientGrpc();
             case "2":
                 Console.WriteLine("Sockets selected.");
                 return new CommsClientSockets();
             case "3":
                 Console.WriteLine("WebSockets selected.");
-                return new CommsClientSockets();
+                return new CommsClientWebSockets();
             default:
                 Console.WriteLine("Invalid selection. Please try again.");
                 continue;
