@@ -1,8 +1,6 @@
-using System;
-
 namespace McComms.Core;
 
 public interface ICommsHost {
-    string Host { get; set; }
-    int Port { get; set; }
+    string Host { get; init; }
+    int Port { get; init; }
 }
