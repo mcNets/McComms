@@ -4,27 +4,27 @@ using McComms.Core;
 namespace McComms.Core.Tests;
 
 [TestFixture]
-public class CommandResponseTests
+public class CommandRequestTests
 {
     [Test]
     public void ToString_FormatsCorrectly()
     {
-        var response = new CommandResponse(true, "ID1", "msg");
-        Assert.That(response.ToString(), Is.EqualTo("True:ID1:msg"));
+        var response = new CommandRequest(1, "msg,p1,p2");
+        Assert.That(response.ToString(), Is.EqualTo("1:msg,p1,p2"));
     }
 
     [Test]
-    public void TryParseCommandResponse_ValidString_ParsesCorrectly()
+    public void TryParseCommandRequest_ValidString_ParsesCorrectly()
     {
-        var str = "True:ID1:hello world";
-        var result = str.TryParseCommandResponse(out var response);
+        var str = "2:hello world,p1:p2";
+        var result = str.TryParseCommandResponse(out var request);
         Assert.Multiple(() =>
         {
             Assert.That(result, Is.True);
-            Assert.That(response, Is.Not.Null);
-            Assert.That(response!.Success, Is.True);
-            Assert.That(response.Id, Is.EqualTo("ID1"));
-            Assert.That(response.Message, Is.EqualTo("hello world"));
+            Assert.That(request, Is.Not.Null);
+            Assert.That(request!.Success, Is.True);
+            Assert.That(request.Id, Is.EqualTo("ID1"));
+            Assert.That(request.Message, Is.EqualTo("hello world"));
         });
     }
 
@@ -56,6 +56,20 @@ public class CommandResponseTests
         {
             Assert.That(result, Is.False);
             Assert.That(response, Is.Null);
+        });
+    }
+
+    [Test]
+    public void TryParseCommandReqauest_ValidString_ParsesCorrectly()
+    {
+        var str = "1:ID1:hello world";
+        var result = str.TryParseCommandRequest(out var command);
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.True);
+            Assert.That(command, Is.Not.Null);
+            Assert.That(command!.Id, Is.EqualTo(1));
+            Assert.That(command.Message, Is.EqualTo("ID1:hello world"));
         });
     }
 }
