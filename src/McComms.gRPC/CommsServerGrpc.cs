@@ -26,6 +26,11 @@ public class CommsServerGrpc : ICommsServer
     }
 
     /// <summary>
+    /// Gets the underlying gRPC server instance
+    /// summary>
+    public CommsHost CommsHost => _grpcServer.CommsHost;
+
+    /// <summary>
     /// Callback that is invoked when a command is received from a client
     /// </summary>
     public Func<CommandRequest, CommandResponse>? CommandReceived { get; set; }
@@ -54,6 +59,17 @@ public class CommsServerGrpc : ICommsServer
     /// <param name="msg">The message to send to all clients</param>
     public void SendBroadcast(BroadcastMessage msg) {
         _grpcServer.SendBroadcast(new mcBroadcast { Id = msg.Id, Content = msg.Message });
+    }
+
+    /// <summary>
+    /// Asynchronously sends a broadcast message to all connected clients
+    /// </summary>
+    /// <param name="msg">The message to send to all clients</param>
+    /// <param name="cancellationToken">Cancellation token to cancel the operation</param>
+    /// <returns>A task representing the asynchronous operation</returns>
+    /// <exception cref="ArgumentNullException">Thrown if the gRPC server is not initialized</exception>
+    public async Task SendBroadcastAsync(BroadcastMessage msg, CancellationToken cancellationToken = default) {
+        await _grpcServer.SendBroadcastAsync(new mcBroadcast { Id = msg.Id, Content = msg.Message }, cancellationToken);
     }
 
     /// <summary>
