@@ -62,8 +62,15 @@ public class GrpcServer : mcServeis.mcServeisBase
     /// </summary>
     /// <param name="onCommandReceived">Function that will process received commands</param>
     /// <exception cref="ArgumentNullException">Thrown if the server is not initialized</exception>
-    public void Start(Func<mcCommandRequest, mcCommandResponse>? onCommandReceived) {
+    public void Start(Func<mcCommandRequest, mcCommandResponse> onCommandReceived) {
         ArgumentNullException.ThrowIfNull(_server);
+
+        // Check if the server is already running
+        if (_isRunning) {
+            Debug.WriteLine("Server is already running.");
+            return;
+        }
+
         this.OnCommandReceived = onCommandReceived;
         _server.Start();
         _isRunning = true;
@@ -72,14 +79,29 @@ public class GrpcServer : mcServeis.mcServeisBase
     /// <summary>
     /// Stops the gRPC server and releases all resources
     /// </summary>
-    public void Stop()
+    public async Task StopAsync()
     {
         if (_server != null && _isRunning) {
-            _server.ShutdownAsync().Wait();
-            _isRunning = false;
+            try {
+                await _server.ShutdownAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex) {
+                Debug.WriteLine($"Error shutting down server: {ex.Message}");
+            }
+            finally {
+                _isRunning = false;
+            }
         }
         
         _broadcastWriters.Clear();
+    }
+
+    /// <summary>
+    /// Stops the gRPC server synchronously
+    /// </summary>
+    public void Stop()
+    {
+        StopAsync().GetAwaiter().GetResult();
     }
 
     /// <summary>
@@ -95,10 +117,16 @@ public class GrpcServer : mcServeis.mcServeisBase
         return Task.FromResult(new mcCommandResponse { Success = response.Success, Id = response.Id, Message = response.Message });
     }
 
+
     /// Sends a broadcast message to all connected clients
     /// </summary>
     /// <param name="message">The message to send to all clients</param>
     public void SendBroadcast(mcBroadcast message) {
+        if (_server == null || !_isRunning) {
+            Debug.WriteLine("Server is not running. Cannot send broadcast.");
+            throw new InvalidOperationException("Server is not running. Cannot send broadcast.");
+        }
+
         Task.Run(async () => {
             await SendBroadcastAsync(message);
         });

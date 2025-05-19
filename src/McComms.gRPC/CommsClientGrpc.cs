@@ -1,8 +1,4 @@
-﻿// filepath: c:\Code\McComms\src\McComms.gRPC\CommsClientGrpc.cs
-using Commsproto;
-using McComms.gRPC;
-
-namespace McComms.gRPC;
+﻿namespace McComms.gRPC;
 
 /// <summary>
 /// Implementation of ICommsClient based on gRPC.
@@ -28,6 +24,8 @@ public class CommsClientGrpc : ICommsClient
     public CommsClientGrpc(string host, int port) {
         _client = new GrpcClient(host, port);
     }
+
+    public CommsHost CommsHost => _client.CommsHost;
 
     /// <summary>
     /// Callback that is invoked when a broadcast message is received

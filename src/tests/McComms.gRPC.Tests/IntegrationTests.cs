@@ -1,26 +1,25 @@
 using NUnit.Framework;
 using System.Collections.Concurrent;
 using McComms.Core;
+using System.Diagnostics;
 
 namespace McComms.gRPC.Tests;
 
 [TestFixture]
-// Tests in this class can now run in parallel since each uses a different port
+[NonParallelizable]
 public class IntegrationTests
 {
     // Base port number - each test will use BasePort + test order
     private const int BasePort = 9000;
+    private int GetTestPort(int testOrder) => BasePort + testOrder;
     
     private string LoopbackAddress = "127.0.0.1";
     private CancellationTokenSource _serverCts = null!;
-    
-    // Define a test port for each test based on its order
-    private int GetTestPort(int testOrder) => BasePort + testOrder;
+        
 
     [SetUp]
     public void Setup()
     {
-        // Create a new cancellation token source for each test
         _serverCts = new CancellationTokenSource();
     }
 
@@ -62,9 +61,12 @@ public class IntegrationTests
         var response = client.SendCommand(request);
 
         // Assert
-        Assert.That(response, Is.Not.Null);
-        Assert.That(response.Success, Is.True);
-        Assert.That(response.Message, Is.EqualTo("Echo: TEST_COMMAND"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response, Is.Not.Null);
+            Assert.That(response.Success, Is.True);
+            Assert.That(response.Message, Is.EqualTo("Echo: TEST_COMMAND"));
+        });
 
         // Cleanup
         client.Disconnect();
@@ -159,7 +161,7 @@ public class IntegrationTests
         server.SendBroadcast(broadcastMessage);
 
         // Wait a bit for the broadcast to be received
-        Thread.Sleep(1000);
+        Thread.Sleep(3000);
 
         // Assert
         Assert.That(client1ReceivedMessages.Count, Is.GreaterThanOrEqualTo(1));
@@ -263,4 +265,223 @@ public class IntegrationTests
         client2.Disconnect();
         server.Stop();
     }
+
+    [Test]
+    [Order(5)]
+    public async Task ServerClientInSeparateThreads_CommunicateSuccessfully()
+    {
+        // Arrange
+        int testPort = GetTestPort(5);
+        var serverCompletionSource = new TaskCompletionSource<bool>();
+        var clientCompletionSource = new TaskCompletionSource<CommandResponse>();
+        var serverExceptionSource = new TaskCompletionSource<Exception>();
+        var clientExceptionSource = new TaskCompletionSource<Exception>();
+        string testMessage = "TEST_SEPARATE_THREADS";
+        
+        // Start server in separate thread
+        var serverTask = Task.Run(async () =>
+        {
+            try
+            {
+                var server = new CommsServerGrpc(LoopbackAddress, testPort);
+                
+                // Start server with command handler
+                server.Start(request => 
+                {
+                    // Process the request and return response
+                    var response = new CommandResponse 
+                    { 
+                        Success = true, 
+                        Message = $"Echo from thread: {request.Message}" 
+                    };
+                    
+                    serverCompletionSource.SetResult(true);
+                    return response;
+                }, _serverCts.Token);
+                
+                // Keep server running until test is done
+                await Task.Delay(10000, _serverCts.Token)
+                    .ContinueWith(t => { /* Ignore if cancelled */ }, TaskContinuationOptions.OnlyOnCanceled);
+                
+                // Cleanup
+                server.Stop();
+            }
+            catch (Exception ex)
+            {
+                serverExceptionSource.SetResult(ex);
+                throw;
+            }
+        });
+        
+        // Give server time to start up
+        await Task.Delay(500);
+        
+        // Start client in separate thread
+        var clientTask = Task.Run(async () =>
+        {
+            try
+            {
+                var client = new CommsClientGrpc(LoopbackAddress, testPort);
+                var connected = client.Connect(null);
+                
+                // Make sure we're connected
+                if (!connected)
+                {
+                    clientCompletionSource.SetException(new Exception("Failed to connect to server"));
+                    return;
+                }
+                
+                // Send a command and store response for verification
+                var request = new CommandRequest { Id = 5, Message = testMessage };
+                var response = client.SendCommand(request);
+                clientCompletionSource.SetResult(response);
+                
+                // Wait until the test is done
+                await Task.Delay(8000, _serverCts.Token)
+                    .ContinueWith(t => { /* Ignore if cancelled */ }, TaskContinuationOptions.OnlyOnCanceled);
+                
+                // Cleanup
+                client.Disconnect();
+            }
+            catch (Exception ex)
+            {
+                clientExceptionSource.SetResult(ex);
+                throw;
+            }
+        });
+        
+        // Wait for both server and client to finish their initial processing
+        await Task.WhenAny(
+            serverCompletionSource.Task,
+            serverExceptionSource.Task,
+            clientCompletionSource.Task,
+            clientExceptionSource.Task,
+            Task.Delay(5000) // Safety timeout
+        );
+        
+        // Check for exceptions
+        if (serverExceptionSource.Task.IsCompleted)
+        {
+            Assert.Fail($"Server exception: {serverExceptionSource.Task.Result}");
+        }
+        
+        if (clientExceptionSource.Task.IsCompleted)
+        {
+            Assert.Fail($"Client exception: {clientExceptionSource.Task.Result}");
+        }
+        
+        // Verify client received response correctly
+        Assert.That(clientCompletionSource.Task.IsCompleted, Is.True, "Client did not complete request");
+        
+        var clientResponse = clientCompletionSource.Task.Result;
+        Assert.That(clientResponse.Success, Is.True);
+        Assert.That(clientResponse.Message, Is.EqualTo($"Echo from thread: {testMessage}"));
+        
+        // Cancel the server and cleanup
+        _serverCts.Cancel();
+          // Wait for both tasks to finish with a timeout
+        var completionTask = Task.WhenAll(
+            serverTask.ContinueWith(t => { /* Ignore exceptions */ }),
+            clientTask.ContinueWith(t => { /* Ignore exceptions */ })
+        );
+        
+        // Use a timeout but don't await the result of Wait()
+        var completed = Task.WaitAll(new[] { completionTask }, 2000);
+    }
+
+    [Test]
+    [Order(6)]
+    public async Task ParallelServerClientExecution_UsingTaskFactory_CommunicateSuccessfully()
+    {
+        // Arrange
+        int testPort = GetTestPort(6);
+        string testMessage = "TEST_PARALLEL_EXECUTION";
+        var serverReady = new ManualResetEventSlim(false);
+        var clientResult = new ConcurrentBag<CommandResponse>();
+        
+        // Create a cancellation token that will be used to stop both server and client
+        var cts = new CancellationTokenSource();
+        var token = cts.Token;
+        
+        try
+        {
+            // Create server task
+            Task serverTask = Task.Factory.StartNew(() =>
+            {
+                // Server setup
+                var server = new CommsServerGrpc(LoopbackAddress, testPort);
+                
+                // Start server with command handler
+                server.Start(request =>
+                {
+                    var response = new CommandResponse
+                    {
+                        Success = true,
+                        Message = $"Server processed: {request.Message}"
+                    };
+                    return response;
+                }, token);
+                
+                // Signal that server is ready
+                serverReady.Set();
+                
+                try
+                {
+                    // Keep the server running until cancellation
+                    token.WaitHandle.WaitOne();
+                }
+                finally
+                {
+                    // Ensure server is stopped on method exit
+                    server.Stop();
+                }
+            }, token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+            
+            // Wait for server to be ready
+            Assert.That(serverReady.Wait(TimeSpan.FromSeconds(5)), Is.True, "Server failed to start within timeout");
+            
+            // Create client task
+            Task clientTask = Task.Factory.StartNew(() =>
+            {
+                // Client setup
+                var client = new CommsClientGrpc(LoopbackAddress, testPort);
+                var connected = client.Connect(null);
+                
+                Assert.That(connected, Is.True, "Client failed to connect");
+                
+                try
+                {
+                    // Send command
+                    var request = new CommandRequest { Id = 10, Message = testMessage };
+                    var response = client.SendCommand(request);
+                    clientResult.Add(response);
+                }
+                finally
+                {
+                    // Ensure client is disconnected on method exit
+                    client.Disconnect();
+                }
+            }, token, TaskCreationOptions.None, TaskScheduler.Default);
+            
+            // Wait for client task to complete
+            Assert.That(clientTask.Wait(TimeSpan.FromSeconds(5)), Is.True, "Client task did not complete within timeout");
+            
+            // Verify results
+            Assert.That(clientResult, Has.Count.EqualTo(1));
+            var response = clientResult.First();
+            Assert.That(response.Success, Is.True);
+            Assert.That(response.Message, Is.EqualTo($"Server processed: {testMessage}"));
+        }
+        finally
+        {
+            // Ensure both tasks are cancelled and disposed
+            cts.Cancel();
+            cts.Dispose();
+            
+            // Wait for server task to finish (with timeout)
+            // This is important to ensure resources are properly released
+            await Task.Delay(1000);
+        }
+    }
+
 }

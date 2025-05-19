@@ -7,6 +7,10 @@ namespace McComms.gRPC;
 /// This class handles both sending commands and receiving broadcast messages.
 /// </summary>
 public class GrpcClient : IDisposable, IAsyncDisposable {
+    // Default host and port
+    public const string DEFAULT_HOST = "0.0.0.0";
+    public const int DEFAULT_PORT = 50051;
+
     // Communication channel with the gRPC server
     private readonly Channel? _channel;
 
@@ -22,23 +26,14 @@ public class GrpcClient : IDisposable, IAsyncDisposable {
     // Tracking whether Dispose has been called
     private bool _disposed = false;
 
-    // Host address where the server listens for incoming connections
-    private readonly string _host;
-
-    // Port on which the server listens for incoming connections
-    private readonly int _port;
-
-    // Default host and port
-    public const string DEFAULT_HOST = "0.0.0.0";
-    public const int DEFAULT_PORT = 50051;
+    private readonly CommsHost? _commsHost;
 
     /// <summary>
     /// Default constructor that initializes the connection to localhost:50051
     /// </summary>
     public GrpcClient() {
-        _host = DEFAULT_HOST;
-        _port = DEFAULT_PORT;
-        _channel = new Channel(Host, Port, ChannelCredentials.Insecure);
+        _commsHost = new CommsHost(DEFAULT_HOST, DEFAULT_PORT);
+        _channel = new Channel(_commsHost.Host, _commsHost.Port, ChannelCredentials.Insecure);
         _client = new mcServeis.mcServeisClient(_channel);
     }
 
@@ -48,21 +43,15 @@ public class GrpcClient : IDisposable, IAsyncDisposable {
     /// <param name="host">gRPC server address</param>
     /// <param name="port">gRPC server port</param>
     public GrpcClient(string host, int port) {
-        _host = host;
-        _port = port;
-        _channel = new Channel(Host, Port, ChannelCredentials.Insecure);
+        _commsHost = new CommsHost(host, port);
+        _channel = new Channel(_commsHost.Host, _commsHost.Port, ChannelCredentials.Insecure);
         _client = new mcServeis.mcServeisClient(_channel);
     }
 
     /// <summary>
-    /// Gets the host address where the server listens for incoming connections
+    /// Gets the CommsHost object that contains the host and port information
     /// </summary>
-    public string Host => _host;
-
-    /// <summary>
-    /// Gets the port on which the server listens for incoming connections
-    /// </summary>
-    public int Port => _port;
+    public CommsHost CommsHost => _commsHost ?? throw new InvalidOperationException("CommsHost is not initialized. Please ensure the client is properly constructed.");
 
     /// <summary>
     /// Gets the gRPC channel used for communication with the server
@@ -143,6 +132,20 @@ public class GrpcClient : IDisposable, IAsyncDisposable {
     }
 
     /// <summary>
+    /// Safely disconnects from the gRPC server
+    /// </summary>
+    public void Disconnect() {
+        Task.Run( async () => {
+            try {
+                await DisconnectAsync();
+            }
+            catch (Exception ex) {
+                Debug.WriteLine($"Error during disconnection: {ex.Message}");
+            }
+        });
+    }
+
+    /// <summary>
     /// Safely disconnects from the gRPC server asynchronously
     /// </summary>
     /// <returns>A task that represents the asynchronous disconnect operation</returns>
@@ -167,13 +170,6 @@ public class GrpcClient : IDisposable, IAsyncDisposable {
             // Errors during disconnection can generally be ignored
             Debug.WriteLine($"Error during disconnection: {ex.Message}");
         }
-    }
-
-    /// <summary>
-    /// Safely disconnects from the gRPC server
-    /// </summary>
-    public void Disconnect() {
-        _ = DisconnectAsync();
     }
 
     /// <summary>
@@ -230,6 +226,7 @@ public class GrpcClient : IDisposable, IAsyncDisposable {
     /// Releases all resources used by the GrpcClient
     /// </summary>
     public void Dispose() {
+        if (_disposed) return;
         Dispose(true);
         GC.SuppressFinalize(this);
     }
@@ -245,8 +242,6 @@ public class GrpcClient : IDisposable, IAsyncDisposable {
                 Disconnect();
                 _cancellationTokenSource?.Dispose();
             }
-
-            // Set large fields to null
             _disposed = true;
         }
     }
@@ -256,15 +251,9 @@ public class GrpcClient : IDisposable, IAsyncDisposable {
     /// </summary>
     public async ValueTask DisposeAsync() {
         if (!_disposed) {
-            // Await asynchronous operations
             await DisconnectAsync().ConfigureAwait(false);
-
-            // Dispose other resources
             _cancellationTokenSource?.Dispose();
-
             _disposed = true;
-
-            // Suppress finalization
             GC.SuppressFinalize(this);
         }
     }
