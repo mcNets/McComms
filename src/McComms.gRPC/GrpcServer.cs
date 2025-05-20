@@ -101,7 +101,7 @@ public class GrpcServer : mcServeis.mcServeisBase
     /// </summary>
     public void Stop()
     {
-        StopAsync().GetAwaiter().GetResult();
+        _ = StopAsync().ConfigureAwait(false);
     }
 
     /// <summary>
