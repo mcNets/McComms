@@ -5,23 +5,27 @@
 /// Handles connection, message sending, and background message listening.
 /// </summary>
 public class SocketsClient : IDisposable {
+    // Constants
+    public const string DEFAULT_HOST = "127.0.0.1";
+    public const int DEFAULT_PORT = 8888;
+    private const int MAX_BUFFER_SIZE = 1500;
+
+    // Default poll delay in milliseconds to avoid busy waiting
+    private const int DEFAULT_POLL_DELAY_MS = 5;
     // Underlying TCP socket
     private readonly Socket _socket;
     // Server endpoint to connect to
     private readonly IPEndPoint _endPoint;
     // Network stream for reading/writing data
     private NetworkStream? _stream;
-    // Buffer size constants
-    private const int MAX_BUFFER_SIZE = 1500;
-    private const int DEFAULT_PORT = 8888;
-    // Default poll delay in milliseconds to avoid busy waiting
-    private const int DEFAULT_POLL_DELAY_MS = 5;
     // Poll delay in milliseconds to avoid busy waiting
     private readonly int _pollDelayMs;
     // ManualResetEvent for synchronizing broadcast message handling
     private static readonly SemaphoreSlim _broadcastSemaphore = new(1, 1);
     // Flag to indicate if a message is being sent
     private volatile bool _isSending = false;
+
+    private readonly CommsHost? _commsHost;
 
     /// <summary>
     /// Callback invoked when a message is received from the server.
@@ -30,12 +34,12 @@ public class SocketsClient : IDisposable {
 
     // Task and cancellation for async background message listening
     private Task? _broadcastTask;
-    private CancellationTokenSource? _broadcastCts;
+    private CancellationTokenSource _broadcastCts = new();
 
     /// <summary>
     /// Default constructor. Connects to localhost and default port.
     /// </summary>
-    public SocketsClient() : this(IPAddress.Parse("127.0.0.1"), DEFAULT_PORT, DEFAULT_POLL_DELAY_MS) {
+    public SocketsClient() : this(IPAddress.Parse(DEFAULT_HOST), DEFAULT_PORT, DEFAULT_POLL_DELAY_MS) {
     }
 
     /// <summary>
@@ -51,9 +55,44 @@ public class SocketsClient : IDisposable {
     /// <param name="port">Port number to use</param>
     /// <param name="pollDelayMs">Delay in milliseconds between polls when no data is available</param>
     public SocketsClient(IPAddress host, int port, int pollDelayMs) {
+        _commsHost = new CommsHost(host.ToString(), port);
         _endPoint = new IPEndPoint(host, port);
         _socket = new Socket(_endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
         _pollDelayMs = pollDelayMs > 0 ? pollDelayMs : DEFAULT_POLL_DELAY_MS;
+    }
+
+    /// <summary>
+    /// Gets the CommsHost object that contains the host and port information
+    /// </summary>
+    public CommsHost CommsHost => _commsHost ?? throw new InvalidOperationException("CommsHost is not initialized. Please ensure the client is properly constructed.");
+
+
+    /// <summary>
+    /// Connects to a server and starts background message listening (synchronous version).
+    /// </summary>
+    public bool Connect(Action<byte[]> onMessageReceived) {
+        // Set the callback for received messages
+        OnMessageReceived = onMessageReceived;
+
+        try {
+            // Connect to the server endpoint
+            _socket.Connect(_endPoint);
+            if (_socket.Connected == false) {
+                throw new Exception("Cannot connect to the server.");
+            }
+
+            // Create the network stream for communication
+            _stream = new NetworkStream(_socket);
+
+            // Start the async broadcast message listener in a separate thread
+            _broadcastTask = Task.Run(async () => await WaitBroadcastMessageAsync(_broadcastCts.Token));
+
+            return true;
+        }
+        catch (Exception ex) {
+            System.Diagnostics.Debug.WriteLine($"McComms.Socket ERROR connecting: {ex.Message}");
+            throw;
+        }
     }
 
     /// <summary>
@@ -76,36 +115,6 @@ public class SocketsClient : IDisposable {
             _stream = new NetworkStream(_socket);
 
             // Start the async broadcast message listener in a separate thread
-            _broadcastCts = new CancellationTokenSource();
-            _broadcastTask = Task.Run(async () => await WaitBroadcastMessageAsync(_broadcastCts.Token));
-
-            return true;
-        }
-        catch (Exception ex) {
-            System.Diagnostics.Debug.WriteLine($"McComms.Socket ERROR connecting: {ex.Message}");
-            throw;
-        }
-    }
-
-    /// <summary>
-    /// Connects to the server and starts background message listening (synchronous version).
-    /// </summary>
-    public bool Connect(Action<byte[]> onMessageReceived) {
-        // Set the callback for received messages
-        OnMessageReceived = onMessageReceived;
-
-        try {
-            // Connect to the server endpoint
-            _socket.Connect(_endPoint);
-            if (_socket.Connected == false) {
-                throw new Exception("Cannot connect to the server.");
-            }
-
-            // Create the network stream for communication
-            _stream = new NetworkStream(_socket);
-
-            // Start the async broadcast message listener in a separate thread
-            _broadcastCts = new CancellationTokenSource();
             _broadcastTask = Task.Run(async () => await WaitBroadcastMessageAsync(_broadcastCts.Token));
 
             return true;
@@ -127,6 +136,39 @@ public class SocketsClient : IDisposable {
             // Disconnect and close the socket if connected
             if (_socket is not null && _socket.Connected) {
                 _socket?.Disconnect(false);
+                _socket?.Close();
+            }
+
+            // Wait for the broadcast task to finish with a reasonable timeout
+            if (_broadcastTask is not null && !_broadcastTask.IsCompleted) {
+                try {
+                    _broadcastTask.Wait(TimeSpan.FromSeconds(1));
+                }
+                catch (OperationCanceledException) { /* Expected during cancellation */
+                }
+                catch (Exception ex) {
+                    System.Diagnostics.Debug.WriteLine($"Error waiting for broadcast task: {ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex) {
+            System.Diagnostics.Debug.WriteLine($"McComms.Socket ERROR disconnecting: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Disconnects from the server and stops background message listening.
+    /// </summary>
+    public async Task DisconnectAsync() {
+        try {
+            // Signal the async broadcast task to cancel and exit
+            if (_broadcastCts is not null) {
+                await _broadcastCts.CancelAsync();
+            }
+
+            // Disconnect and close the socket if connected
+            if (_socket is not null && _socket.Connected) {
+                _socket.Disconnect(false);
                 _socket?.Close();
             }
 
@@ -328,7 +370,7 @@ public class SocketsClient : IDisposable {
                 if (await _broadcastSemaphore.WaitAsync(0,cancellationToken)) {
                     try {
                         if (_stream!.DataAvailable) {
-                            var bytesRead = await _stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken);
+                            var bytesRead = await _stream.ReadAsync(buffer, cancellationToken);
                             if (bytesRead <= 0) {
                                 continue;
                             }

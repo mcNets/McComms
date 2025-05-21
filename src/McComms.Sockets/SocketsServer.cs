@@ -10,6 +10,14 @@ namespace McComms.Sockets;
 /// </summary>
 public class SocketsServer : IDisposable {
     /// <summary>
+    /// Constants
+    /// </summary>
+    public const int DEFAULT_BUFFER_SIZE = 1500;
+    public const int DEFAULT_PORT = 8888;
+    public const int DEFAULT_POLL_DELAY_MS = 5;
+    public const string DEFAULT_HOST = "127.0.0.1";
+
+    /// <summary>
     /// TCP listener socket for accepting incoming client connections.
     /// </summary>
     private readonly Socket _tcpListener;
@@ -35,30 +43,18 @@ public class SocketsServer : IDisposable {
     private Func<byte[], byte[]>? _onMessageReceived;
 
     /// <summary>
-    /// Maximum buffer size for message handling.
-    /// </summary>
-    private const int DEFAULT_BUFFER_SIZE = 1500;
-
-    /// <summary>
-    /// Default port number for the server when not specified.
-    /// </summary>
-    private const int DEFAULT_PORT = 8888;
-
-    /// <summary>
-    /// Default poll delay in milliseconds to avoid busy waiting.
-    /// </summary>
-    private const int DEFAULT_POLL_DELAY_MS = 5;
-
-    /// <summary>
     /// Poll delay in milliseconds to avoid busy waiting.
     /// </summary>
     private readonly int _pollDelayMs;
+
+    // The communication host that defines the address and port for the server
+    private readonly CommsHost? _commsHost;
 
     /// <summary>
     /// Initializes a new instance of the SocketsServer class with default settings.
     /// Listens on any IP address and the default port.
     /// </summary>
-    public SocketsServer() : this(IPAddress.Any, DEFAULT_PORT, DEFAULT_POLL_DELAY_MS) {
+    public SocketsServer() : this(IPAddress.Parse(DEFAULT_HOST), DEFAULT_PORT, DEFAULT_POLL_DELAY_MS) {
     }
 
     /// <summary>
@@ -76,10 +72,13 @@ public class SocketsServer : IDisposable {
     /// <param name="port">The port number to use.</param>
     /// <param name="pollDelayMs">The delay in milliseconds between polls when no data is available.</param>
     public SocketsServer(IPAddress ipAddress, int port, int pollDelayMs) {
+        _commsHost = new CommsHost(ipAddress.ToString(), port);
         _tcpEndPoint = new IPEndPoint(ipAddress, port);
         _tcpListener = new Socket(_tcpEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
         _pollDelayMs = pollDelayMs > 0 ? pollDelayMs : DEFAULT_POLL_DELAY_MS;
     }
+
+    public CommsHost CommsHost => _commsHost ?? throw new InvalidOperationException("CommsHost is not initialized.");
 
     /// <summary>
     /// Starts listening for incoming client connections and processes their messages asynchronously.
@@ -142,7 +141,7 @@ public class SocketsServer : IDisposable {
         foreach (var client in _clients) {
             try {
                 if (client.Connected) {
-                        await client.Stream.WriteAsync(command);
+                    await client.Stream.WriteAsync(command);
                 }
             }
             catch {
@@ -164,10 +163,11 @@ public class SocketsServer : IDisposable {
     /// <param name="client">The client model representing the connected client.</param>
     /// <param name="cancellationToken">A cancellation token that can be used to stop message handling.</param>
     /// <returns>A Task representing the asynchronous operation.</returns>    
-    private async Task MessagesHandler(SocketsClientModel client, CancellationToken cancellationToken) {        Debug.Assert(client != null);
+    private async Task MessagesHandler(SocketsClientModel client, CancellationToken cancellationToken) {
+        Debug.Assert(client != null);
         // Get direct reference to message buffer
         var bufferMessage = client.MessageBuffer;
-        
+
         // Use ArrayPool to rent a buffer instead of allocating a new one
         // More efficient than creating a new array for each client
         byte[] buffer = ArrayPool<byte>.Shared.Rent(DEFAULT_BUFFER_SIZE);
@@ -237,8 +237,7 @@ public class SocketsServer : IDisposable {
     /// <summary>
     /// Releases all resources used by the SocketsServer instance.
     /// </summary>
-    public void Dispose()
-    {
+    public void Dispose() {
         Dispose(true);
         GC.SuppressFinalize(this);
     }
@@ -247,36 +246,28 @@ public class SocketsServer : IDisposable {
     /// Releases the unmanaged resources used by the SocketsServer and optionally releases the managed resources.
     /// </summary>
     /// <param name="disposing">true to release both managed and unmanaged resources; false to release only unmanaged resources.</param>
-    protected virtual void Dispose(bool disposing)
-    {
-        if (disposing)
-        {
+    protected virtual void Dispose(bool disposing) {
+        if (disposing) {
             // Close the TCP listener socket
-            if (_tcpListener != null)
-            {
-                try
-                {
+            if (_tcpListener != null) {
+                try {
                     _tcpListener.Close();
                 }
-                catch (Exception ex)
-                {
+                catch (Exception ex) {
                     Debug.WriteLine($"Error during socket close: {ex.Message}");
                 }
             }
 
             // Close all client connections
-            foreach (var client in _clients)
-            {
-                try
-                {
+            foreach (var client in _clients) {
+                try {
                     if (client.Connected) {
                         client.Connected = false;
                         client.Stream?.Close();
                         client.ClientSocket?.Close();
                     }
                 }
-                catch (Exception ex)
-                {
+                catch (Exception ex) {
                     Debug.WriteLine($"Error closing client connection: {ex.Message}");
                 }
             }

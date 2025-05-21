@@ -23,6 +23,8 @@ public class CommsClientSockets : ICommsClient {
         _client = new SocketsClient(host, port);
     }
 
+    public CommsHost CommsHost => _client.CommsHost;
+
     /// <summary>
     /// Gets or sets the callback action that is invoked when a broadcast message is received.
     /// </summary>

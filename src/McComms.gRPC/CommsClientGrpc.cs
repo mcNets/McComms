@@ -43,6 +43,16 @@ public class CommsClientGrpc : ICommsClient
     }
 
     /// <summary>
+    /// Connects to the gRPC server and sets up broadcast listening
+    /// </summary>
+    /// <param name="onBroadcastReceived">Callback function that will be executed when a broadcast is received</param>
+    /// <returns>true if the connection is started successfully</returns>
+    public async Task<bool> ConnectAsync(Action<BroadcastMessage>? onBroadcastReceived, CancellationToken token = default) {
+        OnBroadcastReceived = onBroadcastReceived;
+        return await _client.ConnectAsync(BroadcastReceived, token);
+    }
+
+    /// <summary>
     /// Internal method that adapts broadcast messages from gRPC format to standard format
     /// </summary>
     /// <param name="message">The broadcast message in gRPC format</param>
@@ -58,12 +68,29 @@ public class CommsClientGrpc : ICommsClient
     }
 
     /// <summary>
+    /// Safely disconnects from the gRPC server
+    /// </summary>
+    public async Task DisconnectAsync() {
+        await _client.DisposeAsync();
+    }
+
+    /// <summary>
     /// Sends a command to the server and waits for its response
     /// </summary>
     /// <param name="msg">The command to send</param>
     /// <returns>The server's response</returns>
     public CommandResponse SendCommand(CommandRequest msg) {
         var response = _client.SendCommand(new mcCommandRequest { Id = msg.Id, Content = msg.Message });
+        return new CommandResponse(response.Success, response.Id, response.Message);
+    }
+
+    /// <summary>
+    /// Sends a command to the server and waits for its response
+    /// </summary>
+    /// <param name="msg">The command to send</param>
+    /// <returns>The server's response</returns>
+    public async Task<CommandResponse> SendCommandAsync(CommandRequest msg, CancellationToken token = default) {
+        var response = await _client.SendCommandAsync(new mcCommandRequest { Id = msg.Id, Content = msg.Message }, token);
         return new CommandResponse(response.Success, response.Id, response.Message);
     }
 
