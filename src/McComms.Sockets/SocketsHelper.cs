@@ -31,7 +31,6 @@ public class SocketsHelper
         var encoded = Encoding.UTF8.GetBytes(message);
         return Framed(encoded);
     }
-
     /// <summary>
     /// Decode a bytes array to string (without removing framing).
     /// </summary>
@@ -40,6 +39,15 @@ public class SocketsHelper
     public static string Decode(byte[] response) {
         var msg = Encoding.UTF8.GetString(response, 0, response.Length);
         return msg;
+    }
+
+    /// <summary>
+    /// Decode a ReadOnlySpan<byte> to string (without removing framing).
+    /// </summary>
+    /// <param name="response">Received bytes span</param>
+    /// <returns>Decoded message</returns>
+    public static string Decode(ReadOnlySpan<byte> response) {
+        return Encoding.UTF8.GetString(response);
     }
 
     /// <summary>
