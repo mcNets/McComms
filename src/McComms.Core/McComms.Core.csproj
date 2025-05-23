@@ -10,14 +10,10 @@
 		<Title>Communications client/server</Title>
 		<LanguageVersion>preview</LanguageVersion>
 		<Version>1.0.0</Version>
-		<PackageId>McComms.Core</PackageId>
-		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-		<PackageReadmeFile>Readme.md</PackageReadmeFile>
-		<RepositoryUrl>https://github.com/mcnets/McComms</RepositoryUrl>
-		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 	</PropertyGroup>
+  
   <ItemGroup>
-    <None Include="Readme.md" Pack="true" PackagePath="\" />
+    <None Include="Readme.md" />
   </ItemGroup>
 
 </Project>

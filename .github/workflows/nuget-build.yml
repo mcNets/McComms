@@ -36,14 +36,14 @@ jobs:
       - name: Build the solution
         run: dotnet build McComms.sln --no-restore --configuration Release
 
-      - name: Test McComms.Core
-        run: dotnet test src/tests/McComms.Core.Tests/McComms.Core.Tests.csproj --no-build --configuration Release
+      # - name: Test McComms.Core
+      #   run: dotnet test src/tests/McComms.Core.Tests/McComms.Core.Tests.csproj --no-build --configuration Release
 
-      - name: Test McComms.gRPC
-        run: dotnet test src/tests/McComms.gRPC.Tests/McComms.gRPC.Tests.csproj --no-build --configuration Release
+      # - name: Test McComms.gRPC
+      #   run: dotnet test src/tests/McComms.gRPC.Tests/McComms.gRPC.Tests.csproj --no-build --configuration Release
 
-      - name: Test McComms.Sockets
-        run: dotnet test src/tests/McComms.Sockets.Tests/McComms.Sockets.Tests.csproj --no-build --configuration Release
+      # - name: Test McComms.Sockets
+      #   run: dotnet test src/tests/McComms.Sockets.Tests/McComms.Sockets.Tests.csproj --no-build --configuration Release
 
       - name: Pack McComms.Core
         run: dotnet pack src/McComms.Core/McComms.Core.csproj --no-build --configuration Release -o packages

@@ -7,14 +7,21 @@
 		<Description>Sockets implementation for McComms</Description>
 		<Copyright>Joan Magnet</Copyright>
 		<Authors>Joan Magnet</Authors>
-		<Title>Sockets implementation for McComms</Title>
-		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-		<PackageReadmeFile>Readme.md</PackageReadmeFile>
-		<Version>1.0.0</Version>
-		<LanguageVersion>preview</LanguageVersion>
-		<PackageId>McComms.Sockets</PackageId>
+		<Title>Sockets implementation for McComms</Title>
+		<Authors>Joan Magnet</Authors>
+		<Description>Sockets implementation for McComms</Description>
+		<Copyright>Joan Magnet</Copyright>
+
 		<RepositoryUrl>https://github.com/mcnets/McComms</RepositoryUrl>
+		<PackageProjectUrl>https://github.com/mcnets/McComms</PackageProjectUrl>
+		<PackageReadmeFile>Readme.md</PackageReadmeFile>
+		<PackageOutputPath>..\Packages</PackageOutputPath>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageId>McComms.Sockets</PackageId>		
+
+		<Version>1.0.0</Version>
 	</PropertyGroup>
 
 	<ItemGroup>

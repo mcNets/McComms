@@ -7,18 +7,27 @@
 		<Description>gRPC implementation for McComms</Description>
 		<Copyright>Joan Magnet</Copyright>
 		<Authors>Joan Magnet</Authors>
-		<Title>gRPC implementation for McComms</Title>
-		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-		<PackageLicenseExpression>MIT</PackageLicenseExpression>
-		<PackageReadmeFile>Readme.md</PackageReadmeFile>
-		<Version>1.0.0</Version>
 		<LanguageVersion>preview</LanguageVersion>
-		<PackageId>McComms.gRPC</PackageId>
+
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+		<Title>gRPC implementation for McComms</Title>
+		<Authors>Joan Magnet</Authors>
+		<Description>gRPC implementation for McComms</Description>
+		<Copyright>Joan Magnet</Copyright>
+
 		<RepositoryUrl>https://github.com/mcnets/McComms</RepositoryUrl>
+		<PackageProjectUrl>https://github.com/mcnets/McComms</PackageProjectUrl>
+		<PackageReadmeFile>Readme.md</PackageReadmeFile>
+		<PackageOutputPath>..\Packages</PackageOutputPath>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageId>McComms.gRPC</PackageId>
+
+		<Version>1.0.0</Version>
 	</PropertyGroup>
+
 	<ItemGroup>
-	  <Folder Include="Proto\" />
-	  <None Include="Readme.md" Pack="true" PackagePath="\" />
+		<Folder Include="Proto\" />
+		<None Include="Readme.md" Pack="true" PackagePath="\" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -30,17 +39,17 @@
 		<PackageReference Include="Google.Protobuf" Version="3.29.3" />
 		<PackageReference Include="Grpc.Net.Client" Version="2.67.0" />
 		<PackageReference Include="Grpc.Tools" Version="2.70.0">
-			<PrivateAssets>all</PrivateAssets>
+		<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
 	</ItemGroup>
 
 	<ItemGroup>
-    <None Include="Readme.md" Pack="true" PackagePath="" />
-  </ItemGroup>
+		<None Include="Readme.md" Pack="true" PackagePath="" />
+	</ItemGroup>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\McComms.Core\McComms.Core.csproj" />
+		<ProjectReference Include="..\McComms.Core\McComms.Core.csproj" />
 	</ItemGroup>
 
 </Project>
