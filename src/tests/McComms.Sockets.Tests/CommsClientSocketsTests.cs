@@ -32,6 +32,17 @@ public class CommsClientSocketsTests
         // The client should be initialized but not connected at this point
     }
 
-    // Note: These tests would need a mock socket server or integration tests with a real server
-    // Here we're just testing the initialization of the client classes
+    [Test]
+    public void SendCommand_NullArgument_ThrowsArgumentNullException()
+    {
+        var client = new CommsClientSockets();
+        Assert.Throws<InvalidOperationException>(() => client.SendCommand(new Core.CommandRequest(0, string.Empty)));
+    }
+
+    [Test]
+    public void Disconnect_DoesNotThrow()
+    {
+        var client = new CommsClientSockets();
+        Assert.DoesNotThrow(() => client.Disconnect());
+    }
 }

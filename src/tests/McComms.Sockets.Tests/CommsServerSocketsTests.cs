@@ -4,34 +4,67 @@ using System.Net;
 namespace McComms.Sockets.Tests;
 
 [TestFixture]
+[NonParallelizable]
 public class CommsServerSocketsTests
 {
+    private readonly CancellationTokenSource _serverCts = new();
+
     [Test]
+    [Order(1)]
     public void Constructor_WithDefaultParameters_InitializesServer()
     {
-        // Arrange & Act
         var server = new CommsServerSockets();
-
-        // Assert
-        Assert.That(server, Is.Not.Null);
-        // The server should be initialized but not started at this point
+        Assert.Multiple(() =>
+        {
+            Assert.That(server, Is.Not.Null);
+            Assert.That(server.CommsHost.Host, Is.EqualTo(SocketsServer.DEFAULT_HOST));
+            Assert.That(server.CommsHost.Port, Is.EqualTo(SocketsServer.DEFAULT_PORT));
+        });
+        server.Stop();
     }
 
     [Test]
+    [Order(2)]
     public void Constructor_WithCustomParameters_InitializesServer()
     {
-        // Arrange
         var ipAddress = IPAddress.Parse("127.0.0.1");
         var port = 8889;
-
-        // Act
         var server = new CommsServerSockets(ipAddress, port);
-
-        // Assert
-        Assert.That(server, Is.Not.Null);
-        // The server should be initialized but not started at this point
+        Assert.Multiple(() =>
+        {
+            Assert.That(server, Is.Not.Null);
+            Assert.That(server.CommsHost.Host, Is.EqualTo(ipAddress.ToString()));
+            Assert.That(server.CommsHost.Port, Is.EqualTo(port));
+        });
+        server.Stop();
     }
 
-    // Note: More comprehensive tests would involve starting the server and testing
-    // the command handling functionality with real or mock clients
+    [Test]
+    [Order(3)]
+    public void Start_WhenCalled_DoesNotThrowException()
+    {
+        // Arrange
+        var mockCallback = new Func<McComms.Core.CommandRequest, McComms.Core.CommandResponse>(r => new McComms.Core.CommandResponse(true, "Mock Id", "Mock response"));
+
+        var host = "127.0.0.1";
+        var ipAddress = IPAddress.Parse(host);
+        var port = 9002;
+        var server = new CommsServerSockets(ipAddress, port);
+        Assert.DoesNotThrow(() =>
+        {
+            server.Start(mockCallback, _serverCts.Token);
+            server.Stop();
+        });
+    }
+
+    [Test]
+    [Order(4)]
+    public void Stop_WhenCalled_DoesNotThrowException()
+    {
+        var host = "127.0.0.1";
+        var ipAddress = IPAddress.Parse(host);
+        var port = 9003;
+        var server = new CommsServerSockets(ipAddress, port);
+        Assert.DoesNotThrow(() => server.Stop());
+    }
 }

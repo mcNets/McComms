@@ -23,6 +23,8 @@ public class CommsClientSockets : ICommsClient {
         _client = new SocketsClient(host, port);
     }
 
+    public CommsHost CommsHost => _client.CommsHost;
+
     /// <summary>
     /// Gets or sets the callback action that is invoked when a broadcast message is received.
     /// </summary>
@@ -52,15 +54,17 @@ public class CommsClientSockets : ICommsClient {
     /// Disconnects from the server after sending an exit command.
     /// </summary>
     public void Disconnect() {
-        SendExitCommand();
-        _client.Disconnect();
+        if (_client.IsConnected){
+            SendExitCommand();
+        }
+        _client.Dispose();
     }
 
     /// <summary>
     /// Handles received broadcast messages, parses them and invokes the broadcast callback.
     /// </summary>
     /// <param name="message">The received message as a byte array.</param>
-    public void BroadcastReceived(byte[] message) {
+    public void BroadcastReceived(ReadOnlySpan<byte> message) {
         if (SocketsHelper.Decode(message).TryParseBroadcastMessage(out var command) && command != null) {
             OnBroadcastReceived?.Invoke(command);
         }

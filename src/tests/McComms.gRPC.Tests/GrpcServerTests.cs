@@ -31,8 +31,8 @@ public class GrpcServerTests
         Assert.Multiple(() =>
         {
             Assert.That(server, Is.Not.Null);
-            Assert.That(server.Host, Is.EqualTo(GrpcServer.DEFAULT_HOST));
-            Assert.That(server.Port, Is.EqualTo(GrpcServer.DEFAULT_PORT));
+            Assert.That(server.CommsHost.Host, Is.EqualTo(GrpcServer.DEFAULT_HOST));
+            Assert.That(server.CommsHost.Port, Is.EqualTo(GrpcServer.DEFAULT_PORT));
         });
         server.Stop();
     }
@@ -47,8 +47,8 @@ public class GrpcServerTests
         Assert.Multiple(() =>
         {
             Assert.That(server, Is.Not.Null);
-            Assert.That(server.Host, Is.EqualTo(host));
-            Assert.That(server.Port, Is.EqualTo(port));
+            Assert.That(server.CommsHost.Host, Is.EqualTo(host));
+            Assert.That(server.CommsHost.Port, Is.EqualTo(port));
         });
         server.Stop();
     }
@@ -91,4 +91,46 @@ public class GrpcServerTests
         server.Stop();
     }
 
+    [Test]
+    [Order(6)]
+    public void SendBroadcastAsync_ThrowException_WhenServerIsNotRunning()
+    {
+        var host = "127.0.0.1";
+        var port = 9004;
+        var server = new GrpcServer(host, port);
+        Assert.ThrowsAsync<InvalidOperationException>(async () => await server.SendBroadcastAsync(new Commsproto.mcBroadcast()));
+        server.Stop();
+    }
+
+    [Test]
+    [Order(7)]
+    public void Start_WhenCalledMultipleTimes_DoesNotThrowException()
+    {
+        var host = "127.0.0.1";
+        var port = 9007;
+        var server = new GrpcServer(host, port);
+        var mockCallback = new Func<Commsproto.mcCommandRequest, Commsproto.mcCommandResponse>(r => new Commsproto.mcCommandResponse());
+        
+        Assert.DoesNotThrow(() =>
+        {
+            server.Start(mockCallback);
+            server.Start(mockCallback); // Starting again should not throw
+            server.Stop();
+        });
+    }
+
+    [Test]
+    [Order(8)]
+    public void Stop_WhenCalledMultipleTimes_DoesNotThrowException()
+    {
+        var host = "127.0.0.1";
+        var port = 9008;
+        var server = new GrpcServer(host, port);
+        
+        Assert.DoesNotThrow(() =>
+        {
+            server.Stop();
+            server.Stop(); // Stopping again should not throw
+        });
+    }
 }

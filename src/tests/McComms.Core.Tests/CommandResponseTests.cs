@@ -18,7 +18,8 @@ public class CommandResponseTests
     {
         var str = "True:ID1:hello world";
         var result = str.TryParseCommandResponse(out var response);
-        Assert.Multiple(() => {
+        Assert.Multiple(() =>
+        {
             Assert.That(result, Is.True);
             Assert.That(response, Is.Not.Null);
             Assert.That(response!.Success, Is.True);

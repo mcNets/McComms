@@ -10,6 +10,14 @@ namespace McComms.Sockets;
 /// </summary>
 public class SocketsServer : IDisposable {
     /// <summary>
+    /// Constants
+    /// </summary>
+    public const int DEFAULT_BUFFER_SIZE = 1500;
+    public const int DEFAULT_PORT = 8888;
+    public const int DEFAULT_POLL_DELAY_MS = 5;
+    public const string DEFAULT_HOST = "127.0.0.1";
+
+    /// <summary>
     /// TCP listener socket for accepting incoming client connections.
     /// </summary>
     private readonly Socket _tcpListener;
@@ -35,30 +43,21 @@ public class SocketsServer : IDisposable {
     private Func<byte[], byte[]>? _onMessageReceived;
 
     /// <summary>
-    /// Maximum buffer size for message handling.
-    /// </summary>
-    private const int DEFAULT_BUFFER_SIZE = 1500;
-
-    /// <summary>
-    /// Default port number for the server when not specified.
-    /// </summary>
-    private const int DEFAULT_PORT = 8888;
-
-    /// <summary>
-    /// Default poll delay in milliseconds to avoid busy waiting.
-    /// </summary>
-    private const int DEFAULT_POLL_DELAY_MS = 5;
-
-    /// <summary>
     /// Poll delay in milliseconds to avoid busy waiting.
     /// </summary>
     private readonly int _pollDelayMs;
+
+    // The communication host that defines the address and port for the server
+    private readonly CommsHost? _commsHost;
+
+    // Semaphore for message processing synchronization
+    private readonly SemaphoreSlim _messageProcessingLock = new(1, 1);
 
     /// <summary>
     /// Initializes a new instance of the SocketsServer class with default settings.
     /// Listens on any IP address and the default port.
     /// </summary>
-    public SocketsServer() : this(IPAddress.Any, DEFAULT_PORT, DEFAULT_POLL_DELAY_MS) {
+    public SocketsServer() : this(IPAddress.Parse(DEFAULT_HOST), DEFAULT_PORT, DEFAULT_POLL_DELAY_MS) {
     }
 
     /// <summary>
@@ -76,10 +75,13 @@ public class SocketsServer : IDisposable {
     /// <param name="port">The port number to use.</param>
     /// <param name="pollDelayMs">The delay in milliseconds between polls when no data is available.</param>
     public SocketsServer(IPAddress ipAddress, int port, int pollDelayMs) {
+        _commsHost = new CommsHost(ipAddress.ToString(), port);
         _tcpEndPoint = new IPEndPoint(ipAddress, port);
         _tcpListener = new Socket(_tcpEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
         _pollDelayMs = pollDelayMs > 0 ? pollDelayMs : DEFAULT_POLL_DELAY_MS;
     }
+
+    public CommsHost CommsHost => _commsHost ?? throw new InvalidOperationException("CommsHost is not initialized.");
 
     /// <summary>
     /// Starts listening for incoming client connections and processes their messages asynchronously.
@@ -136,25 +138,49 @@ public class SocketsServer : IDisposable {
     /// <param name="command">The message to broadcast as a byte array.</param>
     /// <returns>A Task representing the asynchronous operation.</returns>
     public async ValueTask SendBroadcastAsync(byte[] command) {
-        int disconnectedCount = 0;
+        await _messageProcessingLock.WaitAsync();
+        try {
+            int disconnectedCount = 0;
+            var clientsToRemove = new List<SocketsClientModel>();
 
-        // Process only connected clients
-        foreach (var client in _clients) {
-            try {
-                if (client.Connected) {
+            foreach (var client in _clients) {
+                try {
+                    if (client.Connected) {
                         await client.Stream.WriteAsync(command);
+                    }
+                    else {
+                        clientsToRemove.Add(client);
+                    }
+                }
+                catch {
+                    client.Connected = false;
+                    clientsToRemove.Add(client);
+                    disconnectedCount++;
                 }
             }
-            catch {
-                // Just mark client as disconnected, no need to remove from the collection
-                client.Connected = false;
-                disconnectedCount++;
+
+            if (clientsToRemove.Count > 10 || (_clients.Count > 0 && clientsToRemove.Count > _clients.Count * 0.1)) {
+                foreach (var client in clientsToRemove) {
+                    try {
+                        client.Stream?.Close();
+                        client.ClientSocket?.Close();
+                    }
+                    catch { }
+                }
+
+                var connectedClients = _clients.Where(c => c.Connected).ToArray();
+                _clients.Clear();
+                foreach (var client in connectedClients) {
+                    _clients.Add(client);
+                }
+            }
+
+            if (disconnectedCount > 0) {
+                Debug.WriteLine($"{disconnectedCount} client(s) marked as disconnected, total clients in collection: {_clients.Count}");
             }
         }
-
-        // Log disconnected clients if any
-        if (disconnectedCount > 0) {
-            Debug.WriteLine($"{disconnectedCount} client(s) marked as disconnected, total clients in collection: {_clients.Count}");
+        finally {
+            _messageProcessingLock.Release();
         }
     }
 
@@ -164,10 +190,11 @@ public class SocketsServer : IDisposable {
     /// <param name="client">The client model representing the connected client.</param>
     /// <param name="cancellationToken">A cancellation token that can be used to stop message handling.</param>
     /// <returns>A Task representing the asynchronous operation.</returns>    
-    private async Task MessagesHandler(SocketsClientModel client, CancellationToken cancellationToken) {        Debug.Assert(client != null);
+    private async Task MessagesHandler(SocketsClientModel client, CancellationToken cancellationToken) {
+        Debug.Assert(client != null);
         // Get direct reference to message buffer
         var bufferMessage = client.MessageBuffer;
-        
+
         // Use ArrayPool to rent a buffer instead of allocating a new one
         // More efficient than creating a new array for each client
         byte[] buffer = ArrayPool<byte>.Shared.Rent(DEFAULT_BUFFER_SIZE);
@@ -198,10 +225,16 @@ public class SocketsServer : IDisposable {
                             case SocketsHelper.ETX:
                                 // End of message: process and respond
                                 if (receivingMessage && bufferMessage.Count > 0 && _onMessageReceived != null) {
-                                    var message = bufferMessage.ToArray();
-                                    var response = _onMessageReceived?.Invoke(message);
-                                    if (response != null) {
-                                        await client.Stream.WriteAsync(response, cancellationToken);
+                                    await _messageProcessingLock.WaitAsync(cancellationToken);
+                                    try {
+                                        var message = bufferMessage.ToArray();
+                                        var response = _onMessageReceived?.Invoke(message);
+                                        if (response != null) {
+                                            await client.Stream.WriteAsync(response, cancellationToken);
+                                        }
+                                    }
+                                    finally {
+                                        _messageProcessingLock.Release();
                                     }
                                 }
                                 receivingMessage = false;
@@ -217,8 +250,7 @@ public class SocketsServer : IDisposable {
                     }
                 }
                 else {
-                    // Avoid busy waiting using configurable delay
-                    await Task.Delay(_pollDelayMs, cancellationToken);
+                    // Avoid busy waiting using configurable delay                await Task.Delay(_pollDelayMs, cancellationToken);
                 }
             }
         }
@@ -227,6 +259,9 @@ public class SocketsServer : IDisposable {
             throw;
         }
         finally {
+            // Return the buffer to the ArrayPool to avoid memory leaks
+            ArrayPool<byte>.Shared.Return(buffer);
+            
             // Just ensure client is marked as disconnected
             // No need to remove from the collection
             client.Connected = false;
@@ -237,8 +272,7 @@ public class SocketsServer : IDisposable {
     /// <summary>
     /// Releases all resources used by the SocketsServer instance.
     /// </summary>
-    public void Dispose()
-    {
+    public void Dispose() {
         Dispose(true);
         GC.SuppressFinalize(this);
     }
@@ -247,36 +281,28 @@ public class SocketsServer : IDisposable {
     /// Releases the unmanaged resources used by the SocketsServer and optionally releases the managed resources.
     /// </summary>
     /// <param name="disposing">true to release both managed and unmanaged resources; false to release only unmanaged resources.</param>
-    protected virtual void Dispose(bool disposing)
-    {
-        if (disposing)
-        {
+    protected virtual void Dispose(bool disposing) {
+        if (disposing) {
             // Close the TCP listener socket
-            if (_tcpListener != null)
-            {
-                try
-                {
+            if (_tcpListener != null) {
+                try {
                     _tcpListener.Close();
                 }
-                catch (Exception ex)
-                {
+                catch (Exception ex) {
                     Debug.WriteLine($"Error during socket close: {ex.Message}");
                 }
             }
 
             // Close all client connections
-            foreach (var client in _clients)
-            {
-                try
-                {
+            foreach (var client in _clients) {
+                try {
                     if (client.Connected) {
                         client.Connected = false;
                         client.Stream?.Close();
                         client.ClientSocket?.Close();
                     }
                 }
-                catch (Exception ex)
-                {
+                catch (Exception ex) {
                     Debug.WriteLine($"Error closing client connection: {ex.Message}");
                 }
             }

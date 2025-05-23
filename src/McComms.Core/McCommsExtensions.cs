@@ -5,8 +5,12 @@ public static class McCommsExtensions {
 
     // Attempts to parse a string into a CommandRequest record.
     // The expected format is "Id:Message". Returns true if parsing is successful.
-    public static bool TryParseCommandRequest(this string request, out CommandRequest? commandRequest) {
+    public static bool TryParseCommandRequest(this string? request, out CommandRequest? commandRequest) {
         commandRequest = null;
+
+        if (string.IsNullOrEmpty(request)) {
+            return false;
+        }
 
         var parts = request.Split(':');
 
@@ -45,8 +49,12 @@ public static class McCommsExtensions {
 
     // Attempts to parse a string into a BroadcastMessage record.
     // The expected format is "Id:Message". Returns true if parsing is successful.
-    public static bool TryParseBroadcastMessage(this string request, out BroadcastMessage? broadcastMessage) {
+    public static bool TryParseBroadcastMessage(this string? request, out BroadcastMessage? broadcastMessage) {
         broadcastMessage = null;
+
+        if (string.IsNullOrEmpty(request)) {
+            return false;
+        }
 
         var parts = request.Split(':');
 

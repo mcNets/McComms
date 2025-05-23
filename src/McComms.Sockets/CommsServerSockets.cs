@@ -24,6 +24,11 @@ public class CommsServerSockets : ICommsServer {
     }
 
     /// <summary>
+    /// Gets the underlying gRPC server instance
+    /// summary>
+    public CommsHost CommsHost => _socketServer.CommsHost;
+
+    /// <summary>
     /// Callback function that is invoked when a command is received.
     /// </summary>
     public Func<CommandRequest, CommandResponse>? CommandReceived { get; set; }
@@ -52,6 +57,15 @@ public class CommsServerSockets : ICommsServer {
     public void SendBroadcast(BroadcastMessage msg) {
         // Fire and forget - SendBroadcast does not catch exceptions.
         _ = _socketServer.SendBroadcastAsync(SocketsHelper.Encode(msg.ToString()));
+    }
+
+    /// <summary>
+    /// Sends a broadcast message to all connected clients.
+    /// </summary>
+    /// <param name="msg">The broadcast message to send.</param>
+    public async Task SendBroadcastAsync(BroadcastMessage msg) {
+        // Fire and forget - SendBroadcast does not catch exceptions.
+        await _socketServer.SendBroadcastAsync(SocketsHelper.Encode(msg.ToString()));
     }
 
     /// <summary>

@@ -1,5 +1,5 @@
-using System;
-
 namespace McComms.Core;
 
-public record CommsHost(string Host, int Port);
+public record CommsHost(string Host, int Port) {
+    public override string ToString() => $"{Host}:{Port}";
+}

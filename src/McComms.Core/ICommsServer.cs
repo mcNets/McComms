@@ -3,7 +3,7 @@
 /// <summary>
 /// Interface for a communications server. Handles starting, stopping, broadcasting, and command reception.
 /// </summary>
-public interface ICommsServer {
+public interface  ICommsServer {
     /// <summary>
     /// Starts the server and sets the callback for received commands.
     /// </summary>

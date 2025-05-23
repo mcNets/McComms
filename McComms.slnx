@@ -10,6 +10,10 @@
     <Project Path="src/tests/McComms.gRPC.Tests/McComms.gRPC.Tests.csproj" />
     <Project Path="src/tests/McComms.WebSockets.Tests/McComms.WebSockets.Tests.csproj" />
   </Folder>
+  <Folder Name="/Demos/">
+    <Project Path="src/demos/DemoClient/DemoClient.csproj" />
+    <Project Path="src/demos/DemoServer/DemoServer.csproj" />
+  </Folder>
   <Project Path="src/McComms.Core/McComms.Core.csproj" />
   <Project Path="src/McComms.gRPC/McComms.gRPC.csproj" />
   <Project Path="src/McComms.Sockets/McComms.Sockets.csproj" />

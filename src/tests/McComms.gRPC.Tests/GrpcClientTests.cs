@@ -14,8 +14,8 @@ public class GrpcClientTests
         Assert.Multiple(() =>
         {
             Assert.That(client, Is.Not.Null);
-            Assert.That(client.Host, Is.EqualTo(GrpcClient.DEFAULT_HOST));
-            Assert.That(client.Port, Is.EqualTo(GrpcClient.DEFAULT_PORT));
+            Assert.That(client.CommsHost.Host, Is.EqualTo(GrpcClient.DEFAULT_HOST));
+            Assert.That(client.CommsHost.Port, Is.EqualTo(GrpcClient.DEFAULT_PORT));
         });
     }
 
@@ -26,9 +26,12 @@ public class GrpcClientTests
         var host = "custom.host";
         var port = 9000;
         var client = new GrpcClient(host, port);
-        Assert.That(client, Is.Not.Null);
-        Assert.That(client.Host, Is.EqualTo(host));
-        Assert.That(client.Port, Is.EqualTo(port));
+        Assert.Multiple(() =>
+        {
+            Assert.That(client, Is.Not.Null);
+            Assert.That(client.CommsHost.Host, Is.EqualTo(host));
+            Assert.That(client.CommsHost.Port, Is.EqualTo(port));
+        });
     }
 
     [Test]
@@ -66,5 +69,29 @@ public class GrpcClientTests
         var response = await client.SendCommandAsync(new Commsproto.mcCommandRequest());
         Assert.That(response, Is.Not.Null);
         Assert.That(response.Success, Is.False);
+    }
+
+    [Test]
+    [Order(7)]
+    public void Dispose_CalledTwice_DoesNotThrowException()
+    {
+        var client = new GrpcClient();
+        Assert.DoesNotThrow(() =>
+        {
+            client.Dispose();
+            client.Dispose();
+        });
+    }
+
+    [Test]
+    [Order(8)]
+    public async Task DisposeAsync_CalledTwice_DoesNotThrowException()
+    {
+        var client = new GrpcClient();
+        await client.DisposeAsync();
+        Assert.DoesNotThrowAsync(async () =>
+        {
+            await client.DisposeAsync();
+        });
     }
 }
