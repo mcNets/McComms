@@ -45,8 +45,8 @@ jobs:
       # - name: Test McComms.Sockets
       #   run: dotnet test src/tests/McComms.Sockets.Tests/McComms.Sockets.Tests.csproj --no-build --configuration Release
 
-      - name: Pack McComms.Core
-        run: dotnet pack src/McComms.Core/McComms.Core.csproj --no-build --configuration Release -o packages
+      # - name: Pack McComms.Core
+      #   run: dotnet pack src/McComms.Core/McComms.Core.csproj --no-build --configuration Release -o packages
 
       - name: Pack McComms.gRPC
         run: dotnet pack src/McComms.gRPC/McComms.gRPC.csproj --no-build --configuration Release -o packages
