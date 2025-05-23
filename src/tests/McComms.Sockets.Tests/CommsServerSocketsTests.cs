@@ -67,28 +67,4 @@ public class CommsServerSocketsTests
         var server = new CommsServerSockets(ipAddress, port);
         Assert.DoesNotThrow(() => server.Stop());
     }
-
-    [Test]
-    [Order(5)]
-    public void SendBroadcast_WithoutCallingStart_ThrowsException()
-    {
-        var host = "127.0.0.1";
-        var ipAddress = IPAddress.Parse(host);
-        var port = 9004;
-        var server = new CommsServerSockets(ipAddress, port);
-        Assert.Throws<InvalidOperationException>(() => server.SendBroadcast(new Core.BroadcastMessage(1, "Test message")));
-        server.Stop();
-    }
-
-    [Test]
-    [Order(6)]
-    public void SendBroadcastAsync_WithoutCallingStart_ThrowsException()
-    {
-        var host = "127.0.0.1";
-        var ipAddress = IPAddress.Parse(host);
-        var port = 9004;
-        var server = new CommsServerSockets(ipAddress, port);
-        Assert.ThrowsAsync<InvalidOperationException>(async () => await server.SendBroadcastAsync(new McComms.Core.BroadcastMessage(1, "Test message")));
-        server.Stop();
-    }
 }

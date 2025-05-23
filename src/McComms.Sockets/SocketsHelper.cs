@@ -31,6 +31,7 @@ public class SocketsHelper
         var encoded = Encoding.UTF8.GetBytes(message);
         return Framed(encoded);
     }
+    
     /// <summary>
     /// Decode a bytes array to string (without removing framing).
     /// </summary>

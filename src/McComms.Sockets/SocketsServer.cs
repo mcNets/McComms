@@ -136,6 +136,7 @@ public class SocketsServer : IDisposable {
     /// <returns>A Task representing the asynchronous operation.</returns>
     public async ValueTask SendBroadcastAsync(byte[] command) {
         int disconnectedCount = 0;
+        var clientsToRemove = new List<SocketsClientModel>();
 
         // Process only connected clients
         foreach (var client in _clients) {
@@ -143,11 +144,35 @@ public class SocketsServer : IDisposable {
                 if (client.Connected) {
                     await client.Stream.WriteAsync(command);
                 }
+                else {
+                    // Mark disconnected clients for removal
+                    clientsToRemove.Add(client);
+                }
             }
             catch {
-                // Just mark client as disconnected, no need to remove from the collection
+                // Mark client as disconnected and add to removal list
                 client.Connected = false;
+                clientsToRemove.Add(client);
                 disconnectedCount++;
+            }
+        }
+
+        // Remove disconnected clients (periodically clean up)
+        // Only clean up if we have a significant number of disconnected clients
+        if (clientsToRemove.Count > 10 || (_clients.Count > 0 && clientsToRemove.Count > _clients.Count * 0.1)) {
+            foreach (var client in clientsToRemove) {
+                try {
+                    client.Stream?.Close();
+                    client.ClientSocket?.Close();
+                }
+                catch { /* Ignore cleanup errors */ }
+            }
+
+            // Create new collection without disconnected clients
+            var connectedClients = _clients.Where(c => c.Connected).ToArray();
+            _clients.Clear();
+            foreach (var client in connectedClients) {
+                _clients.Add(client);
             }
         }
 
@@ -217,8 +242,7 @@ public class SocketsServer : IDisposable {
                     }
                 }
                 else {
-                    // Avoid busy waiting using configurable delay
-                    await Task.Delay(_pollDelayMs, cancellationToken);
+                    // Avoid busy waiting using configurable delay                await Task.Delay(_pollDelayMs, cancellationToken);
                 }
             }
         }
@@ -227,6 +251,9 @@ public class SocketsServer : IDisposable {
             throw;
         }
         finally {
+            // Return the buffer to the ArrayPool to avoid memory leaks
+            ArrayPool<byte>.Shared.Return(buffer);
+            
             // Just ensure client is marked as disconnected
             // No need to remove from the collection
             client.Connected = false;

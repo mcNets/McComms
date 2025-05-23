@@ -12,6 +12,7 @@ namespace McComms.Sockets;
 public class SocketsClient : IDisposable {
     // Constants
     public const string DEFAULT_HOST = "127.0.0.1";
+
     public const int DEFAULT_PORT = 8888;
 
     // Maximum buffer size for reading messages
@@ -20,12 +21,18 @@ public class SocketsClient : IDisposable {
     // Default poll delay in milliseconds to avoid busy waiting
     private const int DEFAULT_POLL_DELAY_MS = 5;
 
+    // Default timeout for reading messages in milliseconds
+    private const int DEFAULT_READ_TIMEOUT_MS = 10000;
+
+    // Timeout for reading messages in milliseconds
+    private readonly int _readTimeoutMs;
+
     // Underlying TCP socket
     private readonly Socket _socket;
     
     // Server endpoint to connect to
     private readonly IPEndPoint _endPoint;
-    
+        
     // Network stream for reading/writing data
     private NetworkStream? _stream;
     
@@ -33,11 +40,12 @@ public class SocketsClient : IDisposable {
     private readonly int _pollDelayMs;
     
     // ManualResetEvent for synchronizing broadcast message handling
-    private static readonly SemaphoreSlim _broadcastSemaphore = new(1, 1);
+    private readonly SemaphoreSlim _broadcastSemaphore = new(1, 1);
     
     // Flag to indicate if a message is being sent
     private volatile bool _isSending = false;
 
+    // CommsHost object for host and port information
     private readonly CommsHost? _commsHost;
 
     /// <summary>
@@ -49,25 +57,25 @@ public class SocketsClient : IDisposable {
     private Task? _broadcastTask;
     private readonly CancellationTokenSource _broadcastCts = new();
     private readonly List<byte> _broadcastMsgBuffer = new(MAX_BUFFER_SIZE);
-
+    
     /// <summary>
     /// Buffer for storing the response message when sending synchronously and asynchronously.
+    /// Using a single buffer for both operations since they are synchronized by semaphore.
     /// </summary>
-    private readonly List<byte> _responseSendBuffer = new(MAX_BUFFER_SIZE);
-    private readonly List<byte> _responseSendAsyncBuffer = new(MAX_BUFFER_SIZE);
+    private readonly List<byte> _responseBuffer = new(MAX_BUFFER_SIZE);
 
     /// <summary>
     /// Default constructor. Connects to localhost and default port.
     /// </summary>
     public SocketsClient()
-        : this(IPAddress.Parse(DEFAULT_HOST), DEFAULT_PORT, DEFAULT_POLL_DELAY_MS) {
+        : this(IPAddress.Parse(DEFAULT_HOST), DEFAULT_PORT, DEFAULT_POLL_DELAY_MS, DEFAULT_READ_TIMEOUT_MS) {
     }
 
     /// <summary>
     /// Constructor with custom host and port.
     /// </summary>
     public SocketsClient(IPAddress host, int port) 
-        : this(host, port, DEFAULT_POLL_DELAY_MS) {
+        : this(host, port, DEFAULT_POLL_DELAY_MS, DEFAULT_READ_TIMEOUT_MS) {
     }
 
     /// <summary>
@@ -76,11 +84,12 @@ public class SocketsClient : IDisposable {
     /// <param name="host">IP address of the host to connect to</param>
     /// <param name="port">Port number to use</param>
     /// <param name="pollDelayMs">Delay in milliseconds between polls when no data is available</param>
-    public SocketsClient(IPAddress host, int port, int pollDelayMs) {
+    public SocketsClient(IPAddress host, int port, int pollDelayMs = DEFAULT_POLL_DELAY_MS, int readTimeoutMs = DEFAULT_READ_TIMEOUT_MS) {
         _commsHost = new CommsHost(host.ToString(), port);
         _endPoint = new IPEndPoint(host, port);
         _socket = new Socket(_endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
         _pollDelayMs = pollDelayMs > 0 ? pollDelayMs : DEFAULT_POLL_DELAY_MS;
+        _readTimeoutMs = readTimeoutMs > 0 ? readTimeoutMs : DEFAULT_READ_TIMEOUT_MS;
     }
 
     /// <summary>
@@ -174,19 +183,17 @@ public class SocketsClient : IDisposable {
             // Set sending flag and acquire semaphore to prevent conflicts with broadcast receiving
             _broadcastSemaphore.Wait();
             _isSending = true;
+            bool hasResponse = false;
 
             // Send the message
             _stream!.Write(message);
 
             // Get a buffer from the ArrayPool
-            byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(MAX_BUFFER_SIZE);
-
-            try {
+            byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(MAX_BUFFER_SIZE);            try {
                 // Wait for the response
-                bool hasResponse = false;
                 int posBuffer = -1;
                 bool foundSTX = false;
-                _responseSendBuffer.Clear();
+                _responseBuffer.Clear();
 
                 while (!hasResponse) {
                     var bytesRead = _stream.Read(buffer, 0, buffer.Length);
@@ -199,7 +206,7 @@ public class SocketsClient : IDisposable {
                             if (buffer[x] == SocketsHelper.STX) {
                                 foundSTX = true;
                                 posBuffer = 0;
-                                _responseSendBuffer.Clear();
+                                _responseBuffer.Clear();
                             }
                             // Ignore all bytes before STX
                             continue;
@@ -209,7 +216,7 @@ public class SocketsClient : IDisposable {
                             break;
                         }
                         if (posBuffer >= 0) {
-                            _responseSendBuffer.Add(buffer[x]);
+                            _responseBuffer.Add(buffer[x]);
                             posBuffer++;
                         }
                     }
@@ -220,7 +227,7 @@ public class SocketsClient : IDisposable {
                 }
 
                 // Create the result array
-                return [.. _responseSendBuffer];
+                return [.. _responseBuffer];
             }
             finally {
                 // Return the buffer to the pool to avoid memory leaks
@@ -247,21 +254,24 @@ public class SocketsClient : IDisposable {
     public async Task<byte[]> SendAsync(byte[] message, CancellationToken cancellationToken = default) {
         if (_socket?.Connected == false) {
             throw new InvalidOperationException("Socket not connected");
-        }
-        if (message.Length == 0) {
+        }        if (message.Length == 0) {
             throw new InvalidOperationException("Message is empty");
         }
+        
         if (message[0] != SocketsHelper.STX || message[^1] != SocketsHelper.ETX) {
             throw new InvalidOperationException("Message is not properly framed. Expected: [STX] + Message + [ETX]");
         }
-
+        
+        using var timeOutCts = new CancellationTokenSource(_readTimeoutMs);
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(timeOutCts.Token, cancellationToken);
+        var combinedToken = linkedCts.Token;
         try {
             // Set sending flag and acquire semaphore
-            await _broadcastSemaphore.WaitAsync(cancellationToken);
+            await _broadcastSemaphore.WaitAsync(combinedToken);
             _isSending = true;
 
             // Send the message
-            await _stream!.WriteAsync(message, cancellationToken);
+            await _stream!.WriteAsync(message, combinedToken);
 
             // Get a buffer from the ArrayPool
             byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(MAX_BUFFER_SIZE);
@@ -271,10 +281,9 @@ public class SocketsClient : IDisposable {
                 bool hasResponse = false;
                 int posBuffer = -1;
                 bool foundSTX = false;
-                _responseSendAsyncBuffer.Clear();
-
-                while (!hasResponse && !cancellationToken.IsCancellationRequested) {
-                    var bytesRead = await _stream.ReadAsync(buffer, cancellationToken);
+                _responseBuffer.Clear();
+                while (!hasResponse && !combinedToken.IsCancellationRequested) {
+                    var bytesRead = await _stream.ReadAsync(buffer, combinedToken);
                     if (bytesRead == 0) {
                         throw new Exception("No data received");
                     }
@@ -284,7 +293,7 @@ public class SocketsClient : IDisposable {
                             if (buffer[x] == SocketsHelper.STX) {
                                 foundSTX = true;
                                 posBuffer = 0;
-                                _responseSendAsyncBuffer.Clear();
+                                _responseBuffer.Clear();
                             }
                             // Ignore all bytes before STX
                             continue;
@@ -294,7 +303,7 @@ public class SocketsClient : IDisposable {
                             break;
                         }
                         if (posBuffer >= 0) {
-                            _responseSendAsyncBuffer.Add(buffer[x]);
+                            _responseBuffer.Add(buffer[x]);
                             posBuffer++;
                         }
                     }
@@ -303,8 +312,8 @@ public class SocketsClient : IDisposable {
                 if (posBuffer == 0) {
                     throw new Exception("No data received");
                 }
-                
-                return [.. _responseSendAsyncBuffer];
+
+                return [.. _responseBuffer];
             }
             finally {
                 // Return the buffer to the pool
@@ -312,7 +321,12 @@ public class SocketsClient : IDisposable {
             }
         }
         catch (OperationCanceledException) {
-            System.Diagnostics.Debug.WriteLine("McComms.Socket: Operation was cancelled");
+            if (combinedToken.IsCancellationRequested) {
+                System.Diagnostics.Debug.WriteLine("McComms.Socket: Operation was cancelled due to timeout");
+            }
+            else {
+                System.Diagnostics.Debug.WriteLine("McComms.Socket: Operation was cancelled");
+            }
             throw;
         }
         catch (Exception ex) {
@@ -349,11 +363,23 @@ public class SocketsClient : IDisposable {
                 }
 
                 // Try to acquire the semaphore to prevent conflicts with send operations
-                if (await _broadcastSemaphore.WaitAsync(0, cancellationToken)) {
+                if (await _broadcastSemaphore.WaitAsync(100, cancellationToken)) {
                     try {
                         if (_stream!.DataAvailable) {
-                            var bytesRead = await _stream.ReadAsync(buffer, cancellationToken);
-                            if (bytesRead <= 0 || cancellationToken.IsCancellationRequested) {
+                            // Create a linked cancellation token with timeout
+                            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                            timeoutCts.CancelAfter(_readTimeoutMs);
+                            
+                            int bytesRead;
+                            try {
+                                bytesRead = await _stream.ReadAsync(buffer, timeoutCts.Token);
+                                if (bytesRead <= 0 || cancellationToken.IsCancellationRequested) {
+                                    continue;
+                                }
+                            }
+                            catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested) {
+                                // Just log the timeout and continue, as broadcast reading is continuous
+                                System.Diagnostics.Debug.WriteLine($"Broadcast read operation timed out after {_readTimeoutMs} ms");
                                 continue;
                             }
 
@@ -464,8 +490,7 @@ public class SocketsClient : IDisposable {
                 _socket.Disconnect(false);
                 _socket?.Close();
             }
-        }
-        catch (Exception ex) {
+        }        catch (Exception ex) {
             System.Diagnostics.Debug.WriteLine($"McComms.Socket ERROR disconnecting: {ex.Message}");
         }
     }
@@ -478,8 +503,7 @@ public class SocketsClient : IDisposable {
         _broadcastSemaphore?.Dispose();
         _broadcastCts?.Dispose();
         _broadcastMsgBuffer?.Clear();
-        _responseSendBuffer?.Clear();
-        _responseSendAsyncBuffer?.Clear();
+        _responseBuffer?.Clear();
         _broadcastTask?.Dispose();
         _stream?.Dispose();
         _socket?.Dispose();
