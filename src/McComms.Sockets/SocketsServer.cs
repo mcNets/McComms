@@ -50,6 +50,9 @@ public class SocketsServer : IDisposable {
     // The communication host that defines the address and port for the server
     private readonly CommsHost? _commsHost;
 
+    // Semaphore for message processing synchronization
+    private readonly SemaphoreSlim _messageProcessingLock = new(1, 1);
+
     /// <summary>
     /// Initializes a new instance of the SocketsServer class with default settings.
     /// Listens on any IP address and the default port.
@@ -135,50 +138,49 @@ public class SocketsServer : IDisposable {
     /// <param name="command">The message to broadcast as a byte array.</param>
     /// <returns>A Task representing the asynchronous operation.</returns>
     public async ValueTask SendBroadcastAsync(byte[] command) {
-        int disconnectedCount = 0;
-        var clientsToRemove = new List<SocketsClientModel>();
+        await _messageProcessingLock.WaitAsync();
+        try {
+            int disconnectedCount = 0;
+            var clientsToRemove = new List<SocketsClientModel>();
 
-        // Process only connected clients
-        foreach (var client in _clients) {
-            try {
-                if (client.Connected) {
-                    await client.Stream.WriteAsync(command);
-                }
-                else {
-                    // Mark disconnected clients for removal
-                    clientsToRemove.Add(client);
-                }
-            }
-            catch {
-                // Mark client as disconnected and add to removal list
-                client.Connected = false;
-                clientsToRemove.Add(client);
-                disconnectedCount++;
-            }
-        }
-
-        // Remove disconnected clients (periodically clean up)
-        // Only clean up if we have a significant number of disconnected clients
-        if (clientsToRemove.Count > 10 || (_clients.Count > 0 && clientsToRemove.Count > _clients.Count * 0.1)) {
-            foreach (var client in clientsToRemove) {
+            foreach (var client in _clients) {
                 try {
-                    client.Stream?.Close();
-                    client.ClientSocket?.Close();
+                    if (client.Connected) {
+                        await client.Stream.WriteAsync(command);
+                    }
+                    else {
+                        clientsToRemove.Add(client);
+                    }
                 }
-                catch { /* Ignore cleanup errors */ }
+                catch {
+                    client.Connected = false;
+                    clientsToRemove.Add(client);
+                    disconnectedCount++;
+                }
             }
 
-            // Create new collection without disconnected clients
-            var connectedClients = _clients.Where(c => c.Connected).ToArray();
-            _clients.Clear();
-            foreach (var client in connectedClients) {
-                _clients.Add(client);
+            if (clientsToRemove.Count > 10 || (_clients.Count > 0 && clientsToRemove.Count > _clients.Count * 0.1)) {
+                foreach (var client in clientsToRemove) {
+                    try {
+                        client.Stream?.Close();
+                        client.ClientSocket?.Close();
+                    }
+                    catch { }
+                }
+
+                var connectedClients = _clients.Where(c => c.Connected).ToArray();
+                _clients.Clear();
+                foreach (var client in connectedClients) {
+                    _clients.Add(client);
+                }
+            }
+
+            if (disconnectedCount > 0) {
+                Debug.WriteLine($"{disconnectedCount} client(s) marked as disconnected, total clients in collection: {_clients.Count}");
             }
         }
-
-        // Log disconnected clients if any
-        if (disconnectedCount > 0) {
-            Debug.WriteLine($"{disconnectedCount} client(s) marked as disconnected, total clients in collection: {_clients.Count}");
+        finally {
+            _messageProcessingLock.Release();
         }
     }
 
@@ -223,10 +225,16 @@ public class SocketsServer : IDisposable {
                             case SocketsHelper.ETX:
                                 // End of message: process and respond
                                 if (receivingMessage && bufferMessage.Count > 0 && _onMessageReceived != null) {
-                                    var message = bufferMessage.ToArray();
-                                    var response = _onMessageReceived?.Invoke(message);
-                                    if (response != null) {
-                                        await client.Stream.WriteAsync(response, cancellationToken);
+                                    await _messageProcessingLock.WaitAsync(cancellationToken);
+                                    try {
+                                        var message = bufferMessage.ToArray();
+                                        var response = _onMessageReceived?.Invoke(message);
+                                        if (response != null) {
+                                            await client.Stream.WriteAsync(response, cancellationToken);
+                                        }
+                                    }
+                                    finally {
+                                        _messageProcessingLock.Release();
                                     }
                                 }
                                 receivingMessage = false;

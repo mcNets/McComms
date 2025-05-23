@@ -362,7 +362,7 @@ public class SocketsClient : IDisposable {
                     continue;
                 }
 
-                // Try to acquire the semaphore to prevent conflicts with send operations
+                // Try to acquire the semaphore to prevent conflicts with send/broadcast operations
                 if (await _broadcastSemaphore.WaitAsync(100, cancellationToken)) {
                     try {
                         if (_stream!.DataAvailable) {
