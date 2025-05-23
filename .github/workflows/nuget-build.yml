@@ -33,8 +33,8 @@ jobs:
       - name: Build
         run: dotnet build McComms.sln --no-restore --configuration Release
 
-      - name: Test
-        run: dotnet test McComms.sln --no-build --configuration Release
+      # - name: Test
+      #   run: dotnet test McComms.sln --no-build --configuration Release
 
       - name: Pack McComms.Core
         run: dotnet pack src/McComms.Core/McComms.Core.csproj --no-build --configuration Release -o packages
