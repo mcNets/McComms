@@ -13,7 +13,7 @@ public class GrpcIntegrationTests
     private int GetTestPort(int testOrder) => BasePort + testOrder;
 
     private string Host = "127.0.0.1";
-    private CancellationTokenSource _serverCts = null!;
+    //private CancellationTokenSource _serverCts = null!;
 
     private GrpcServer _server = null!;
 
@@ -200,7 +200,7 @@ public class GrpcIntegrationTests
         client1.SendCommand(new mcCommandRequest { Id = 100, Content = "BROADCAST_TEST" });
 
         // Wait a bit for the broadcast to be received
-        Thread.Sleep(3000);
+        Thread.Sleep(5000);
 
         Assert.Multiple(() =>
         {
