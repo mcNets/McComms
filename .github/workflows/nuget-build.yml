@@ -1,11 +1,13 @@
 name: Build and Create NuGet Packages
 
 on:
+  # This workflow is triggered on push to main/master branches and on pull request closed events
   push:
     branches: [ main, master ]
     paths:
       - 'src/**'
       - '.github/workflows/**'
+
   pull_request:
     branches: [ main, master ]
     types: [ closed ]
@@ -17,12 +19,13 @@ jobs:
   build:
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup .NET
+      - name: Setup .NET version
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 9.0.x
@@ -30,11 +33,17 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore McComms.sln
 
-      - name: Build
+      - name: Build the solution
         run: dotnet build McComms.sln --no-restore --configuration Release
 
-      # - name: Test
-      #   run: dotnet test McComms.sln --no-build --configuration Release
+      - name: Test McComms.Core
+        run: dotnet test src/tests/McComms.Core.Tests/McComms.Core.Tests.csproj --no-build --configuration Release
+
+      - name: Test McComms.gRPC
+        run: dotnet test src/tests/McComms.gRPC.Tests/McComms.gRPC.Tests.csproj --no-build --configuration Release
+
+      - name: Test McComms.Sockets
+        run: dotnet test src/tests/McComms.Sockets.Tests/McComms.Sockets.Tests.csproj --no-build --configuration Release
 
       - name: Pack McComms.Core
         run: dotnet pack src/McComms.Core/McComms.Core.csproj --no-build --configuration Release -o packages
