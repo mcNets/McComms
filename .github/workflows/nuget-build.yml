@@ -34,7 +34,8 @@ jobs:
     - name: Build
       run: dotnet build --no-restore --configuration Release
       
-    - name: Test      run: dotnet test --no-build --configuration Release
+    - name: Test      
+      run: dotnet test --no-build --configuration Release
       
     - name: Calculate version
       id: version
@@ -59,7 +60,8 @@ jobs:
       
     - name: Pack McComms.WebSockets
       run: dotnet pack src/McComms.WebSockets/McComms.WebSockets.csproj --no-build --configuration Release -p:Version=${{ env.VERSION }} -o packages
-        - name: Upload NuGet packages as artifacts
+        
+    - name: Upload NuGet packages as artifacts
       uses: actions/upload-artifact@v3
       with:
         name: nuget-packages
