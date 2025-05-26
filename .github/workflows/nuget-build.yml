@@ -39,6 +39,9 @@ jobs:
       - name: Test McComms.Core
         run: dotnet test src/tests/McComms.Core.Tests/McComms.Core.Tests.csproj --no-build --configuration Release
 
+      - name: List generated packages
+        run: ls -la src/Packages
+
       # - name: Test McComms.gRPC
       #   run: dotnet test src/tests/McComms.gRPC.Tests/McComms.gRPC.Tests.csproj --no-build --configuration Release
 
@@ -48,33 +51,30 @@ jobs:
       # - name: Pack McComms.Core
       #   run: dotnet pack src/McComms.Core/McComms.Core.csproj --no-build --configuration Release -o packages
 
-      - name: Pack McComms.gRPC
-        run: dotnet pack src/McComms.gRPC/McComms.gRPC.csproj --no-build --configuration Release -o packages
+      # - name: Pack McComms.gRPC
+      #   run: dotnet pack src/McComms.gRPC/McComms.gRPC.csproj --no-build --configuration Release -o packages
 
-      - name: Pack McComms.Sockets
-        run: dotnet pack src/McComms.Sockets/McComms.Sockets.csproj --no-build --configuration Release -o packages
+      # - name: Pack McComms.Sockets
+      #   run: dotnet pack src/McComms.Sockets/McComms.Sockets.csproj --no-build --configuration Release -o packages
 
-      - name: Pack McComms.WebSockets
-        run: dotnet pack src/McComms.WebSockets/McComms.WebSockets.csproj --no-build --configuration Release -o packages
+      # - name: Pack McComms.WebSockets
+      #   run: dotnet pack src/McComms.WebSockets/McComms.WebSockets.csproj --no-build --configuration Release -o packages
 
-      - name: Upload NuGet packages as artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: nuget-packages
-          path: packages/*.nupkg
+      # - name: Upload NuGet packages as artifacts
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: nuget-packages
+      #     path: packages/*.nupkg
 
-      - name: Create Packages directory if it doesn't exist
-        run: mkdir -p src/Packages
+      # - name: Create Packages directory if it doesn't exist
+      #   run: mkdir -p src/Packages
 
-      - name: Copy NuGet packages to Packages directory
-        run: cp packages/*.nupkg src/Packages/
+      # - name: Copy NuGet packages to Packages directory
+      #   run: cp packages/*.nupkg src/Packages/
 
-      - name: Push packages to NuGet.org
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-        run: |
-          for package in packages/*.nupkg; do
-            dotnet nuget push $package --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
-          done
-
-      - name: List generated packages
-        run: ls -la packages/
+      # - name: Push packages to NuGet.org
+      #   if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+      #   run: |
+      #     for package in packages/*.nupkg; do
+      #       dotnet nuget push $package --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+      #     done

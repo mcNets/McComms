@@ -4,16 +4,23 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>WebSockets implementation for McComms</Description>
-    <Copyright>Joan Magnet</Copyright>
-    <Authors>Joan Magnet</Authors>
+    <LanguageVersion>preview</LanguageVersion>  
+  
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Title>WebSockets implementation for McComms</Title>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-    <Version>1.0.0</Version>
+		<Authors>Joan Magnet</Authors>
+    <Description>WebSockets implementation for McComms</Description>
+		<Copyright>Joan Magnet</Copyright>
+
+		<RepositoryUrl>https://github.com/mcnets/McComms</RepositoryUrl>
+		<PackageProjectUrl>https://github.com/mcnets/McComms</PackageProjectUrl>
+		<PackageReadmeFile>Readme.md</PackageReadmeFile>
+		<PackageOutputPath>..\Packages</PackageOutputPath>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageId>McComms.WebSockets</PackageId>
-    <RepositoryUrl>https://github.com/mcnets/McComms</RepositoryUrl>
-    <LanguageVersion>preview</LanguageVersion>  </PropertyGroup>
+  
+    <Version>1.0.0</Version>
+  </PropertyGroup>
 
   <ItemGroup>
     <None Include="Readme.md" Pack="true" PackagePath="\" />
