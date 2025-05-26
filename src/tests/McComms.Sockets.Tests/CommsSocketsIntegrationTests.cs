@@ -251,7 +251,7 @@ public class CommsSocketsIntegrationTests
         {
             Assert.That(response, Is.Not.Null);
             Assert.That(response.Success, Is.True);
-            Assert.That(response.Message.Length, Is.GreaterThan(2000), "Response should contain a long message");
+            Assert.That(response?.Message?.Length, Is.GreaterThan(2000), "Response should contain a long message");
         });
 
         client.Disconnect();

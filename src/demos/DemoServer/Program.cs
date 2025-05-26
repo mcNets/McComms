@@ -15,6 +15,11 @@ timer.Elapsed += (sender, e) =>
     Console.WriteLine($"Broadcasting clock: {dateTime}");
 
     dateTime.TryParseBroadcastMessage(out var msg);
+    if (msg == null)
+    {
+        Console.WriteLine("Failed to create broadcast message.");
+        return;
+    }
     CommsServer?.SendBroadcast(new BroadcastMessage(msg.Id, msg.Message));
 };
 

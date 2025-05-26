@@ -25,7 +25,11 @@
 
   <ItemGroup>
     <None Include="Readme.md" Pack="true" PackagePath="\" />
-    <ProjectReference Include="..\McComms.Core\McComms.Core.csproj" />
+		<None Include="..\..\mccomms-websockets.png" Pack="true" PackagePath="\" />
   </ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\McComms.Core\McComms.Core.csproj" />
+	</ItemGroup>
 
 </Project>
