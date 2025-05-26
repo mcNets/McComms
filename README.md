@@ -12,6 +12,74 @@ McComms is designed to offer a common interface for client-server communications
 
 The library is structured to allow easy substitution of the communication technology without changing the main application code.
 
+## Communication Models
+
+### Command Request/Response Flow
+
+```
++--------+                      +--------+
+| Client |                      | Server |
++--------+                      +--------+
+    |                               |
+    | CommandRequest(Id, Message)   |
+    |------------------------------>|
+    |                               | Process
+    |                               | Command
+    |                               |
+    | CommandResponse(Success, Id, Message)
+    |<------------------------------|
+    |                               |
+```
+
+**CommandRequest Model:**
+```csharp
+public record CommandRequest(int Id = 0, string Message = "");
+```
+
+| Parameter | Type   | Description                             |
+|-----------|--------|-----------------------------------------|
+| Id        | int    | Unique identifier for the command       |
+| Message   | string | Command message content or parameters   |
+
+**CommandResponse Model:**
+```csharp
+public record CommandResponse(bool Success = false, string? Id = "", string? Message = "");
+```
+
+| Parameter | Type   | Description                               |
+|-----------|--------|-------------------------------------------|
+| Success   | bool   | Indicates if the command was successful   |
+| Id        | string | Identifies which command this responds to |
+| Message   | string | Response content or result data           |
+
+### Broadcast Message Flow
+
+```
++--------+                      +--------+
+| Server |                      | Client |
++--------+                      +--------+
+    |                               |
+    | BroadcastMessage(Id, Message) |
+    |------------------------------>|
+    |                               |
+    |                      +--------+
+    |                      | Client |
+    |                      +--------+
+    | BroadcastMessage(Id, Message) |
+    |------------------------------>|
+    |                               |
+```
+
+**BroadcastMessage Model:**
+```csharp
+public record BroadcastMessage(int Id = 0, string Message = "");
+```
+
+| Parameter | Type   | Description                              |
+|-----------|--------|------------------------------------------|
+| Id        | int    | Unique identifier for the broadcast type |
+| Message   | string | Broadcast message content                |
+
 ## Project Structure
 
 The project is organized into the following modules:
@@ -26,10 +94,8 @@ The project is organized into the following modules:
 This project uses GitHub Actions for continuous integration and delivery. The workflow includes:
 
 - **Automatic build and test** on each push to main/master and on merged pull requests
-- **Automatic versioning** using the format YYYY.MM.DD.X where X is the number of commits for the day
 - **NuGet package generation** for all library components
 - **GitHub Packages publishing** for easy distribution
-- **Automatic GitHub Release creation** with release notes
 - **McComms.Core.Tests** - Unit tests for the library core
 
 ## Main Features
@@ -45,7 +111,6 @@ This project uses GitHub Actions for continuous integration and delivery. The wo
 The project is available as NuGet packages from GitHub Packages:
 
 ```
-dotnet add package McComms.Core --version <VERSION>
 dotnet add package McComms.Sockets --version <VERSION>
 dotnet add package McComms.gRPC --version <VERSION>
 dotnet add package McComms.WebSockets --version <VERSION>
@@ -54,35 +119,10 @@ dotnet add package McComms.WebSockets --version <VERSION>
 Or through Package Manager:
 
 ```
-Install-Package McComms.Core
 Install-Package McComms.Sockets
 Install-Package McComms.gRPC
 Install-Package McComms.WebSockets
 ```
-
-## Using NuGet Packages from GitHub Packages
-
-To use the NuGet packages from GitHub Packages, you'll need to:
-
-1. Create a GitHub Personal Access Token with `read:packages` scope
-2. Add GitHub Packages as a source in your NuGet.config:
-
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<configuration>
-  <packageSources>
-    <add key="github" value="https://nuget.pkg.github.com/OWNER/index.json" />
-  </packageSources>
-  <packageSourceCredentials>
-    <github>
-      <add key="Username" value="USERNAME" />
-      <add key="ClearTextPassword" value="TOKEN" />
-    </github>
-  </packageSourceCredentials>
-</configuration>
-```
-
-Replace `OWNER` with the repository owner, `USERNAME` with your GitHub username, and `TOKEN` with your Personal Access Token.
 
 ## Basic Usage
 
@@ -152,40 +192,19 @@ Contributions are welcome! If you wish to contribute to McComms, please:
 
 ## CI/CD Workflow Details
 
-### Automatic Package Versioning
-
-The GitHub Actions workflow automatically versions packages using a date-based scheme:
-
-- Format: `YYYY.MM.DD.X` 
-- Where `X` is the number of commits made during that day
-
-This means that every time you push to the repository, the version number will automatically increment based on the current date and the number of commits made that day.
-
 ### NuGet Package Generation
 
 The workflow automatically:
 
 1. Builds and tests the solution
-2. Calculates the appropriate version number
-3. Generates NuGet packages for all library components
-4. Uploads the packages as GitHub Actions artifacts
-5. Copies them to the `src/Packages` directory in the repository
-6. Publishes them to GitHub Packages (when pushing to main/master)
-7. Creates a GitHub Release with the generated packages
+2. Generates NuGet packages for all library components
+3. Uploads and publishes the packages as nuget.org artifacts
 
 ### Workflow Triggers
 
 The workflow runs on:
 - Pushes to the main/master branch that affect files in the `src` directory or the workflow itself
 - Merged pull requests to main/master that affect files in the `src` directory or the workflow itself
-
-### Customizing the Workflow
-
-You can customize the workflow by editing the `.github/workflows/nuget-build.yml` file. Some common customizations include:
-
-- Changing version numbering scheme
-- Publishing to additional NuGet feeds
-- Adding additional build or test steps
 
 ## License
 
