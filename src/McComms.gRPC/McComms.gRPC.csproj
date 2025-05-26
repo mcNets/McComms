@@ -45,10 +45,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<None Include="Readme.md" Pack="true" PackagePath="" />
-	</ItemGroup>
-
-	<ItemGroup>
 		<ProjectReference Include="..\McComms.Core\McComms.Core.csproj" />
 	</ItemGroup>
 
