@@ -72,9 +72,10 @@ jobs:
       # - name: Copy NuGet packages to Packages directory
       #   run: cp packages/*.nupkg src/Packages/
 
-      # - name: Push packages to NuGet.org
-      #   if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-      #   run: |
-      #     for package in packages/*.nupkg; do
-      #       dotnet nuget push $package --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
-      #     done
+      - name: Push packages to NuGet.org
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        run: |
+          for package in src/Packages/*.nupkg; 
+          do
+            dotnet nuget push $package --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+          done
