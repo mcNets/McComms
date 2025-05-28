@@ -46,7 +46,7 @@ jobs:
         run: dotnet pack src/McComms.Core/McComms.Core.csproj -o ./src/Packages --configuration Release
 
       - name: Push McComms.Core to NuGet
-        run: dotnet nuget push src/Packages/McComms.Core.*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
+        run: dotnet nuget push src/Packages/McComms.Core.*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
 
       - name: Restore dependencies
         run: dotnet restore McComms.sln
