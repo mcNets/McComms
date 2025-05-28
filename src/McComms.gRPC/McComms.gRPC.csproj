@@ -23,7 +23,7 @@
 		<PackageId>McComms.gRPC</PackageId>
 		<PackageIcon>mccomms-grpc.png</PackageIcon>
 
-		<Version>1.0.01</Version>
+		<Version>1.0.1</Version>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -44,10 +44,7 @@
 		<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-	</ItemGroup>
-
-	<ItemGroup>
-		<ProjectReference Include="..\McComms.Core\McComms.Core.csproj" />
+		<PackageReference Include="McComms.Core" Version="1.0.1"/>
 	</ItemGroup>
 
 </Project>
