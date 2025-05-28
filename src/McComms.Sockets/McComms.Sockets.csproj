@@ -8,12 +8,12 @@
 		<Copyright>Joan Magnet</Copyright>
 		<Authors>Joan Magnet</Authors>
 
-		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<Title>Sockets implementation for McComms</Title>
 		<Authors>Joan Magnet</Authors>
 		<Description>Sockets implementation for McComms</Description>
 		<Copyright>Joan Magnet</Copyright>
 
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<RepositoryUrl>https://github.com/mcnets/McComms</RepositoryUrl>
 		<PackageProjectUrl>https://github.com/mcnets/McComms</PackageProjectUrl>
 		<PackageReadmeFile>Readme.md</PackageReadmeFile>
@@ -22,11 +22,11 @@
 		<PackageId>McComms.Sockets</PackageId>		
 		<PackageIcon>mccomms-sockets.png</PackageIcon>
 
-		<Version>1.0.1</Version>
+		<Version>1.0.2</Version>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="McComms.Core" Version="1.0.1"/>
+		<PackageReference Include="McComms.Core" Version="1.0.2" />
 	</ItemGroup>
 
 	<ItemGroup>

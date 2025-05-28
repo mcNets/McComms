@@ -1,5 +1,4 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
 	<PropertyGroup>
 		<TargetFrameworks>net9.0</TargetFrameworks>
 		<ImplicitUsings>enable</ImplicitUsings>
@@ -9,12 +8,12 @@
 		<Authors>Joan Magnet</Authors>
 		<LanguageVersion>preview</LanguageVersion>
 
-		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<Title>gRPC implementation for McComms</Title>
 		<Authors>Joan Magnet</Authors>
 		<Description>gRPC implementation for McComms</Description>
 		<Copyright>Joan Magnet</Copyright>
 
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<RepositoryUrl>https://github.com/mcnets/McComms</RepositoryUrl>
 		<PackageProjectUrl>https://github.com/mcnets/McComms</PackageProjectUrl>
 		<PackageReadmeFile>Readme.md</PackageReadmeFile>
@@ -23,7 +22,7 @@
 		<PackageId>McComms.gRPC</PackageId>
 		<PackageIcon>mccomms-grpc.png</PackageIcon>
 
-		<Version>1.0.1</Version>
+		<Version>1.0.2</Version>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -44,7 +43,6 @@
 		<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="McComms.Core" Version="1.0.1"/>
+		<PackageReference Include="McComms.Core" Version="1.0.2" />
 	</ItemGroup>
-
 </Project>
