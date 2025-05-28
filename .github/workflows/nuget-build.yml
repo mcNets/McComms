@@ -33,14 +33,23 @@ jobs:
       - name: Remove local nuget.config
         run: rm nuget.config || true
 
+      - name: Restore McComms.Core
+        run: dotnet restore src/McComms.Core/McComms.Core.csproj
+
+      - name: Build McComms.Core
+        run: dotnet build src/McComms.Core/McComms.Core.csproj --configuration Release
+
+      - name: Test McComms.Core
+        run: dotnet test src/tests/McComms.Core.Tests/McComms.Core.Tests.csproj --no-build --configuration Release
+
+      - name: Pack McComms.Core
+        run: dotnet pack src/McComms.Core/McComms.Core.csproj -o ./src/Packages --configuration Release
+
       - name: Restore dependencies
         run: dotnet restore McComms.sln
 
       - name: Build the solution
         run: dotnet build McComms.sln --no-restore --configuration Release
-
-      - name: Test McComms.Core
-        run: dotnet test src/tests/McComms.Core.Tests/McComms.Core.Tests.csproj --no-build --configuration Release
 
       - name: List generated packages
         run: ls -la src/Packages

@@ -9,6 +9,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <ProjectReference Include="..\..\McComms.Core\McComms.Core.csproj" />
 	  <ProjectReference Include="..\..\McComms.gRPC\McComms.gRPC.csproj" />
 	  <ProjectReference Include="..\..\McComms.Sockets\McComms.Sockets.csproj" />
 	  <ProjectReference Include="..\..\McComms.WebSockets\McComms.WebSockets.csproj" />
