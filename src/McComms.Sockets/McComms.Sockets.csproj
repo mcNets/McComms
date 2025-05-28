@@ -22,11 +22,11 @@
 		<PackageId>McComms.Sockets</PackageId>		
 		<PackageIcon>mccomms-sockets.png</PackageIcon>
 
-		<Version>1.0.3</Version>
+		<Version>1.0.4</Version>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="McComms.Core" Version="1.0.2" />
+		<PackageReference Include="McComms.Core" Version="1.0.4" />
 	</ItemGroup>
 
 	<ItemGroup>
