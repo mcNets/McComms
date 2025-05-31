@@ -18,7 +18,8 @@ public class CommsSocketsIntegrationTests
     {
         _serverCts = new CancellationTokenSource();
         _server = new CommsServerSockets(IPAddress.Parse(_host), _basePort);
-          // Start the server with a message handler
+        
+        // Start the server with a message handler
         _server.Start(commandReceived: (request) =>
         {
             if (request.Id == 100)
@@ -26,6 +27,11 @@ public class CommsSocketsIntegrationTests
                 // Simulate a broadcast message
                 var broadcastMessage = new BroadcastMessage { Id = 100, Message = "TEST_BROADCAST" };
                 _server.SendBroadcast(broadcastMessage);
+            }
+            else if (request.Id == 101)
+            {
+                // Handle second command triggered by broadcast callback
+                return new CommandResponse { Success = true, Id = "101", Message = "SECOND_COMMAND_PROCESSED" };
             }
             else if (request.Id == 200)
             {
@@ -35,7 +41,9 @@ public class CommsSocketsIntegrationTests
         }, _serverCts.Token);
             
         await Task.Delay(2000); // Give server time to start
-    }    [OneTimeTearDown]
+    }
+
+    [OneTimeTearDown]
     public void OneTimeTearDown()
     {
         _serverCts.Cancel();
@@ -172,7 +180,9 @@ public class CommsSocketsIntegrationTests
 
         client1.Disconnect();
         client2.Disconnect();
-    }    [Test]
+    }
+
+    [Test]
     [Order(5)]
     public void BroadcastMessage_MultipleConnectedClients_AllReceiveBroadcast()
     {
@@ -271,10 +281,95 @@ public class CommsSocketsIntegrationTests
         var response = await client.SendCommandAsync(request);
         
         Assert.That(response, Is.Not.Null);
-        Assert.That(response.Success, Is.True);
-        
-        // Disconnect asynchronously
+        Assert.That(response.Success, Is.True);        // Disconnect asynchronously
         //await client.SendExitCommandAsync();
+        client.Disconnect();
+    }
+
+    [Test]
+    [Order(8)]
+    public async Task ClientServer_DualChannel_CommandTriggeredBroadcastCanSendAnotherCommand()
+    {
+        // Arrange - Setup synchronization
+        var broadcastReceived = new TaskCompletionSource<bool>();
+        var secondCommandCompleted = new TaskCompletionSource<CommandResponse>();
+        
+        // Create and connect client
+        var client = new CommsClientSockets(IPAddress.Parse(_host), _basePort);
+        var connected = await client.ConnectAsync(onBroadcastReceived: async (broadcast) => 
+        {
+            // When broadcast is received, send another command
+            broadcastReceived.SetResult(true);
+            
+            try 
+            {
+                var secondRequest = new CommandRequest { Id = 101, Message = "TRIGGERED_BY_BROADCAST" };
+                var secondResponse = await client.SendCommandAsync(secondRequest);
+                secondCommandCompleted.SetResult(secondResponse);
+            }
+            catch (Exception ex)
+            {
+                secondCommandCompleted.SetException(ex);
+            }
+        });
+
+        // Assert client connected successfully
+        Assert.That(connected, Is.True, "Client failed to connect to server");
+
+        // Act - Send first command that triggers broadcast
+        var firstRequest = new CommandRequest { Id = 100, Message = "TRIGGER_BROADCAST" };
+        var firstResponse = client.SendCommand(firstRequest);
+
+        // Assert first command was successful
+        Assert.That(firstResponse.Success, Is.True, "First command should succeed");
+
+        // Wait for broadcast to be received (with timeout)
+        var broadcastTimeout = Task.Delay(5000);
+        var broadcastTask = await Task.WhenAny(broadcastReceived.Task, broadcastTimeout);
+        Assert.That(broadcastTask, Is.EqualTo(broadcastReceived.Task), "Broadcast should be received within timeout");
+
+        // Wait for second command to complete (with timeout)  
+        var secondCommandTimeout = Task.Delay(5000);
+        var secondCommandTask = await Task.WhenAny(secondCommandCompleted.Task, secondCommandTimeout);
+        Assert.That(secondCommandTask, Is.EqualTo(secondCommandCompleted.Task), "Second command should complete within timeout");
+
+        // Get and verify second command response
+        var secondResponse = await secondCommandCompleted.Task;
+        Assert.Multiple(() =>
+        {
+            Assert.That(secondResponse, Is.Not.Null, "Second response should not be null");
+            Assert.That(secondResponse.Success, Is.True, "Second command should succeed");
+            Assert.That(secondResponse.Id, Is.EqualTo("101"), "Second response should have correct ID");
+            Assert.That(secondResponse.Message, Is.EqualTo("SECOND_COMMAND_PROCESSED"), "Second response should have correct message");
+        });
+
+        // Cleanup
+        client.Disconnect();
+    }
+
+    [Test]
+    [Order(9)]
+    public async Task ClientServer_SingleClient_ReceiveBroadcast()
+    {
+        var broadcastReceived = new TaskCompletionSource<BroadcastMessage>();
+        
+        var client = new CommsClientSockets(IPAddress.Parse(_host), _basePort);
+        var connected = await client.ConnectAsync(onBroadcastReceived: (msg) =>
+        {
+            // Handle broadcast messages if needed
+            broadcastReceived.SetResult(msg);
+        });
+
+        Assert.That(connected, Is.True, "Client failed to connect to server");
+
+        var request = new CommandRequest { Id = 100, Message = "TEST_COMMAND" };
+        var response = await client.SendCommandAsync(request);
+
+        // Wait for broadcast to be received (with timeout)
+        var broadcastTimeout = Task.Delay(5000);
+        var broadcastTask = await Task.WhenAny(broadcastReceived.Task, broadcastTimeout);
+        Assert.That(broadcastTask, Is.EqualTo(broadcastReceived.Task), "Broadcast should be received within timeout");
+
         client.Disconnect();
     }
 
