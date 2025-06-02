@@ -68,7 +68,6 @@ public class CommsServerSockets : ICommsServer {
     /// </summary>
     /// <param name="msg">The broadcast message to send.</param>
     public void SendBroadcast(BroadcastMessage msg) {
-        // Send broadcast through dedicated broadcast server (port + 1)
         _ = _broadcastServer.SendBroadcastAsync(SocketsHelper.Encode(msg.ToString()));
     }
 
@@ -77,7 +76,6 @@ public class CommsServerSockets : ICommsServer {
     /// </summary>
     /// <param name="msg">The broadcast message to send.</param>
     public async Task SendBroadcastAsync(BroadcastMessage msg) {
-        // Send broadcast through dedicated broadcast server (port + 1)
         await _broadcastServer.SendBroadcastAsync(SocketsHelper.Encode(msg.ToString()));
     }
 

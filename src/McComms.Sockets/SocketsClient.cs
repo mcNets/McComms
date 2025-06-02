@@ -502,7 +502,6 @@ public class SocketsClient : IDisposable {
         _broadcastCts?.Dispose();
         _broadcastMsgBuffer?.Clear();
         _responseBuffer?.Clear();
-        // Note: Task does not implement IDisposable - no need to dispose
         _stream?.Dispose();
         _socket?.Dispose();
         GC.SuppressFinalize(this);
