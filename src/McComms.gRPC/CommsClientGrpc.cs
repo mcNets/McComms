@@ -6,7 +6,6 @@
 /// </summary>
 public class CommsClientGrpc : ICommsClient
 {
-    // Internal gRPC client that handles communications
     private readonly GrpcClient _client;
 
     /// <summary>

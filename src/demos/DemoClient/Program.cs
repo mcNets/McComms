@@ -14,33 +14,28 @@ ICommsClient? CommsClient = SelectClient();
 var token = cts.Token;
 CommsClient?.Connect(OnBroadcastReceived);
 
-while (true)
-{
+while (true) {
     Console.WriteLine("Enter a command to send to the server (or 'exit' to quit):");
 
     string? input = Console.ReadLine();
 
-    if (string.IsNullOrEmpty(input))
-    {
+    if (string.IsNullOrEmpty(input)) {
         continue;
     }
 
-    if (input.Equals("exit", StringComparison.OrdinalIgnoreCase))
-    {
+    if (input.Equals("exit", StringComparison.OrdinalIgnoreCase)) {
         break;
     }
 
     CommandRequest? commandRequest = null;
     input?.TryParseCommandRequest(out commandRequest);
-    if (commandRequest == null)
-    {
+    if (commandRequest == null) {
         Console.WriteLine("Invalid command format. Please use 'Id:Message'.");
         continue;
     }
 
     var resp = CommsClient?.SendCommand(commandRequest);
-    if (resp == null)
-    {
+    if (resp == null) {
         Console.WriteLine("Failed to send command.");
         continue;
     }
@@ -48,27 +43,23 @@ while (true)
     Console.WriteLine($"Response: {resp}");
 }
 
-static void OnBroadcastReceived(BroadcastMessage message)
-{
+static void OnBroadcastReceived(BroadcastMessage message) {
     Console.WriteLine($"Broadcast received: {message}");
 }
 
-static ICommsClient SelectClient()
-{
+static ICommsClient SelectClient() {
     Console.WriteLine("Please select a protocol:");
     Console.WriteLine("0. Quit");
     Console.WriteLine("1. gRPC");
     Console.WriteLine("2. Sockets");
     Console.WriteLine("3. WebSockets");
 
-    while (true)
-    {
+    while (true) {
         Console.Write("Enter your selection: ");
 
         string? input = Console.ReadLine();
 
-        switch (input)
-        {
+        switch (input) {
             case "0":
                 Environment.Exit(0);
                 break;

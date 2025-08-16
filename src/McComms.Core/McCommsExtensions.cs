@@ -4,7 +4,8 @@ namespace McComms.Core;
 public static class McCommsExtensions {
 
     // Attempts to parse a string into a CommandRequest record.
-    // The expected format is "Id:Message". Returns true if parsing is successful.
+    // The expected format is "Id:Message".
+    // Returns true if parsing is successful.
     public static bool TryParseCommandRequest(this string? request, out CommandRequest? commandRequest) {
         commandRequest = null;
 
@@ -25,7 +26,8 @@ public static class McCommsExtensions {
     }
 
     // Attempts to parse a string into a CommandResponse record.
-    // The expected format is "Success:Id:Message". Returns true if parsing is successful.
+    // The expected format is "Success:Id:Message".
+    // Returns true if parsing is successful.
     public static bool TryParseCommandResponse(this string? msg, out CommandResponse? commandResponse) {
         commandResponse = null;
 
@@ -48,7 +50,8 @@ public static class McCommsExtensions {
     }
 
     // Attempts to parse a string into a BroadcastMessage record.
-    // The expected format is "Id:Message". Returns true if parsing is successful.
+    // The expected format is "Id:Message". 
+    // Returns true if parsing is successful.
     public static bool TryParseBroadcastMessage(this string? request, out BroadcastMessage? broadcastMessage) {
         broadcastMessage = null;
 

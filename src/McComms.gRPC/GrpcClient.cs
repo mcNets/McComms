@@ -11,22 +11,16 @@ public class GrpcClient : IDisposable, IAsyncDisposable {
     public const string DEFAULT_HOST = "0.0.0.0";
     public const int DEFAULT_PORT = 50051;
 
-    // Communication channel with the gRPC server
     private readonly Channel? _channel;
-
-    // gRPC client generated from the proto file
     private readonly mcServeis.mcServeisClient _client;
-
-    // Cancellation token to manage client disconnection
     private readonly CancellationTokenSource _cancellationTokenSource = new();
-
-    // Task that handles broadcast message listening
     private Task? _broadcastTask;
+    private readonly CommsHost? _commsHost;
 
-    // Tracking whether Dispose has been called
     private bool _disposed = false;
 
-    private readonly CommsHost? _commsHost;
+    public Channel? GrpcChannel => _channel;
+
 
     /// <summary>
     /// Default constructor that initializes the connection to localhost:50051
@@ -47,6 +41,11 @@ public class GrpcClient : IDisposable, IAsyncDisposable {
         _channel = new Channel(_commsHost.Host, _commsHost.Port, ChannelCredentials.Insecure);
         _client = new mcServeis.mcServeisClient(_channel);
     }
+
+    /// <summary>
+    /// Sets the timeout in seconds for gRPC calls (Default: 3 seconds)
+    /// </summary>
+    public int Timeout { get; set; } = 3;
 
     /// <summary>
     /// Gets the CommsHost object that contains the host and port information
@@ -73,7 +72,15 @@ public class GrpcClient : IDisposable, IAsyncDisposable {
         var token = _cancellationTokenSource.Token;
 
         try {
+            if (_channel == null) {
+                throw new InvalidOperationException("gRPC channel is not initialized.");
+            }
+
+            // Try to connect synchronously by waiting for the ConnectAsync task to complete
+            _channel.ConnectAsync(DateTime.UtcNow.AddMilliseconds(2000)).GetAwaiter().GetResult();
+
             _broadcastTask = Task.Run(async () => {
+
                 var broadcastCall = _client.Broadcast(cancellationToken: token);
 
                 while (await broadcastCall.ResponseStream.MoveNext(token)) {
@@ -104,8 +111,13 @@ public class GrpcClient : IDisposable, IAsyncDisposable {
     public async Task<bool> ConnectAsync(Action<mcBroadcast> onBroadcastReceived, CancellationToken cancellationToken = default) {
         OnBroadcastReceived = onBroadcastReceived;
         var token = CancellationTokenSource.CreateLinkedTokenSource(_cancellationTokenSource.Token, cancellationToken).Token;
-
+        
         try {
+            if (_channel == null) {
+                throw new InvalidOperationException("gRPC channel is not initialized.");
+            }
+            await _channel.ConnectAsync(DateTime.UtcNow.AddMilliseconds(2000));
+
             _broadcastTask = Task.Run(async () => {
                 var broadcastCall = _client.Broadcast(cancellationToken: token);
 
@@ -180,10 +192,10 @@ public class GrpcClient : IDisposable, IAsyncDisposable {
     public mcCommandResponse SendCommand(mcCommandRequest msg) {
         // Configure a reasonable timeout for the operation
         CallOptions options = new CallOptions()
-            .WithDeadline(DateTime.UtcNow.AddSeconds(3));
+            .WithDeadline(DateTime.UtcNow.AddSeconds(Timeout));
 
         try {
-            return _client.SendCommand(msg, options: options);
+            return _client.SendCommand(request: msg, options: options);
         }
         catch (Exception ex) {
             Debug.WriteLine($"Error sending command: {ex.Message}");
@@ -205,7 +217,7 @@ public class GrpcClient : IDisposable, IAsyncDisposable {
     public async Task<mcCommandResponse> SendCommandAsync(mcCommandRequest msg, CancellationToken cancellationToken = default) {
         // Configure a reasonable timeout for the operation
         CallOptions options = new CallOptions()
-            .WithDeadline(DateTime.UtcNow.AddSeconds(3))
+            .WithDeadline(DateTime.UtcNow.AddSeconds(Timeout))
             .WithCancellationToken(cancellationToken);
 
         try {
@@ -226,7 +238,6 @@ public class GrpcClient : IDisposable, IAsyncDisposable {
     /// Releases all resources used by the GrpcClient
     /// </summary>
     public void Dispose() {
-        if (_disposed) return;
         Dispose(true);
         GC.SuppressFinalize(this);
     }
@@ -239,8 +250,16 @@ public class GrpcClient : IDisposable, IAsyncDisposable {
         if (!_disposed) {
             if (disposing) {
                 // Dispose managed resources
-                Disconnect();
+                try {
+                    _cancellationTokenSource?.Cancel();
+                    _broadcastTask?.Wait(TimeSpan.FromSeconds(5)); // Wait with timeout
+                }
+                catch (AggregateException) {
+                    // Ignore cancellation exceptions
+                }
+
                 _cancellationTokenSource?.Dispose();
+                _channel?.ShutdownAsync().Wait(TimeSpan.FromSeconds(5));
             }
             _disposed = true;
         }
@@ -251,10 +270,21 @@ public class GrpcClient : IDisposable, IAsyncDisposable {
     /// </summary>
     public async ValueTask DisposeAsync() {
         if (!_disposed) {
-            await DisconnectAsync().ConfigureAwait(false);
-            _cancellationTokenSource?.Dispose();
-            _disposed = true;
+            await DisposeAsyncCore().ConfigureAwait(false);
+            Dispose(false);
             GC.SuppressFinalize(this);
+        }
+    }
+
+    /// <summary>
+    /// Core implementation of async disposal
+    /// </summary>
+    protected virtual async ValueTask DisposeAsyncCore() {
+        try {
+            await DisconnectAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex) {
+            Debug.WriteLine($"Error during async disposal: {ex.Message}");
         }
     }
 }

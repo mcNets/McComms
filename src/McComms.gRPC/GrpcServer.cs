@@ -6,36 +6,27 @@ using System.Diagnostics;
 /// gRPC server that implements the service defined in the proto file.
 /// This class manages client connections and message distribution.
 /// </summary>
-public class GrpcServer : mcServeis.mcServeisBase
-{
+public class GrpcServer : mcServeis.mcServeisBase {
     // Default host and port for the server
     public const string DEFAULT_HOST = "127.0.0.1";
     public const int DEFAULT_PORT = 50001;
 
-    // Collection of stream writers to send broadcast messages to all connected clients
     private readonly List<IServerStreamWriter<mcBroadcast>> _broadcastWriters;
-    
-    // The gRPC server that handles connections
     private readonly Server? _server;
-
-    // The communication host that defines the address and port for the server
     private readonly CommsHost? _commsHost;
-
-    // Flag indicating whether the server is currently running
     private bool _isRunning = false;
 
-    // Callback that is invoked when a command is received from a client
     private Func<mcCommandRequest, mcCommandResponse>? OnCommandReceived { get; set; }
 
     /// <summary>
     /// Default constructor that initializes the server on the default host and port
     /// </summary>
-    public GrpcServer() {
+    public GrpcServer(ServerCredentials credentials, IEnumerable<ChannelOption>? channelOptions = null) {
         _broadcastWriters = [];
         _commsHost = new CommsHost(DEFAULT_HOST, DEFAULT_PORT);
-        _server = new Server {
+        _server = new Server(channelOptions) {
             Services = { mcServeis.BindService(this) },
-            Ports = { new ServerPort(CommsHost.Host, CommsHost.Port, ServerCredentials.Insecure) }
+            Ports = { new ServerPort(CommsHost.Host, CommsHost.Port, credentials) }
         };
     }
 
@@ -44,12 +35,12 @@ public class GrpcServer : mcServeis.mcServeisBase
     /// </summary>
     /// <param name="host">Address where the server will listen</param>
     /// <param name="port">Port where the server will listen</param>
-    public GrpcServer(string host, int port) {
+    public GrpcServer(string host, int port, ServerCredentials credentials, IEnumerable<ChannelOption>? channelOptions = null) {
         _broadcastWriters = [];
         _commsHost = new CommsHost(host, port);
-        _server = new Server {
+        _server = new Server(channelOptions) {
             Services = { mcServeis.BindService(this) },
-            Ports = { new ServerPort(CommsHost.Host, CommsHost.Port, ServerCredentials.Insecure) }
+            Ports = { new ServerPort(CommsHost.Host, CommsHost.Port, credentials) }
         };
     }
 
@@ -77,10 +68,16 @@ public class GrpcServer : mcServeis.mcServeisBase
     }
 
     /// <summary>
+    /// Stops the gRPC server synchronously
+    /// </summary>
+    public void Stop() {
+        _ = StopAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Stops the gRPC server and releases all resources
     /// </summary>
-    public async Task StopAsync()
-    {
+    public async Task StopAsync() {
         if (_server != null && _isRunning) {
             try {
                 await _server.ShutdownAsync().ConfigureAwait(false);
@@ -92,16 +89,8 @@ public class GrpcServer : mcServeis.mcServeisBase
                 _isRunning = false;
             }
         }
-        
-        _broadcastWriters.Clear();
-    }
 
-    /// <summary>
-    /// Stops the gRPC server synchronously
-    /// </summary>
-    public void Stop()
-    {
-        _ = StopAsync().ConfigureAwait(false);
+        _broadcastWriters.Clear();
     }
 
     /// <summary>
@@ -117,7 +106,6 @@ public class GrpcServer : mcServeis.mcServeisBase
         return Task.FromResult(new mcCommandResponse { Success = response.Success, Id = response.Id, Message = response.Message });
     }
 
-
     /// Sends a broadcast message to all connected clients
     /// </summary>
     /// <param name="message">The message to send to all clients</param>
@@ -131,7 +119,7 @@ public class GrpcServer : mcServeis.mcServeisBase
             await SendBroadcastAsync(message);
         });
     }
-    
+
     /// <summary>
     /// Asynchronously sends a broadcast message to all connected clients   
     /// </summary>
@@ -156,8 +144,8 @@ public class GrpcServer : mcServeis.mcServeisBase
     }
 
     /// <summary>
-    /// Implements the gRPC service method to manage streaming connections
-    /// This method keeps connections with clients open to send broadcasts
+    /// Implements the gRPC service method to manage streaming connections.
+    /// This method keeps opened connections with clients to send broadcasts.
     /// </summary>
     /// <param name="requestStream">Input stream (not used, but required by gRPC)</param>
     /// <param name="responseStream">Stream for sending messages to the client</param>
