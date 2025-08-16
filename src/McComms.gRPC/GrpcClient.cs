@@ -19,6 +19,8 @@ public class GrpcClient : IDisposable, IAsyncDisposable {
 
     private bool _disposed = false;
 
+    public Channel? GrpcChannel => _channel;
+
 
     /// <summary>
     /// Default constructor that initializes the connection to localhost:50051
@@ -70,7 +72,15 @@ public class GrpcClient : IDisposable, IAsyncDisposable {
         var token = _cancellationTokenSource.Token;
 
         try {
+            if (_channel == null) {
+                throw new InvalidOperationException("gRPC channel is not initialized.");
+            }
+
+            // Try to connect synchronously by waiting for the ConnectAsync task to complete
+            _channel.ConnectAsync(DateTime.UtcNow.AddMilliseconds(2000)).GetAwaiter().GetResult();
+
             _broadcastTask = Task.Run(async () => {
+
                 var broadcastCall = _client.Broadcast(cancellationToken: token);
 
                 while (await broadcastCall.ResponseStream.MoveNext(token)) {
@@ -101,8 +111,13 @@ public class GrpcClient : IDisposable, IAsyncDisposable {
     public async Task<bool> ConnectAsync(Action<mcBroadcast> onBroadcastReceived, CancellationToken cancellationToken = default) {
         OnBroadcastReceived = onBroadcastReceived;
         var token = CancellationTokenSource.CreateLinkedTokenSource(_cancellationTokenSource.Token, cancellationToken).Token;
-
+        
         try {
+            if (_channel == null) {
+                throw new InvalidOperationException("gRPC channel is not initialized.");
+            }
+            await _channel.ConnectAsync(DateTime.UtcNow.AddMilliseconds(2000));
+
             _broadcastTask = Task.Run(async () => {
                 var broadcastCall = _client.Broadcast(cancellationToken: token);
 

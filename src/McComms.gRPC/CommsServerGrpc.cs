@@ -49,6 +49,10 @@ public class CommsServerGrpc : ICommsServer
     /// <param name="stoppingToken">Cancellation token to stop the server</param>
     public void Start(Func<CommandRequest, CommandResponse>? onCommandReceived, CancellationToken stoppingToken) {
         CommandReceived = onCommandReceived;
+        // Monitor the cancellation token and stop the server when triggered
+        stoppingToken.Register(() => {
+            Stop();
+        });
         _grpcServer.Start(OnCommandReceived);
     }
 

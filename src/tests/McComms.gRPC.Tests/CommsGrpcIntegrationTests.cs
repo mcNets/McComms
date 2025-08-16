@@ -47,11 +47,10 @@ public class CommsGrpcIntegrationTests
 
     [Test]
     [Order(1)]
-    public void ClientServer_SingleClient_SendCommandReceivesResponse()
-    {
+    public void ClientServer_SingleClient_SendCommandReceivesResponse() {
         // Create and connect client
         var client = new CommsClientGrpc(Host, BasePort);
-        var connected = client.Connect(onBroadcastReceived: (msg) => { 
+        var connected = client.Connect(onBroadcastReceived: (msg) => {
             // Handle broadcast messages if needed
         });
 
@@ -59,12 +58,11 @@ public class CommsGrpcIntegrationTests
         Assert.That(connected, Is.True, "Client failed to connect to server");
 
         // Act - Send a command
-        var request = new Core.CommandRequest { Id = 1,  Message = "TEST_COMMAND" };
+        var request = new Core.CommandRequest { Id = 1, Message = "TEST_COMMAND" };
         var response = client.SendCommand(request);
 
         // Assert
-        Assert.Multiple(() =>
-        {
+        Assert.Multiple(() => {
             Assert.That(response, Is.Not.Null);
             Assert.That(response.Success, Is.True);
             Assert.That(response.Message, Is.EqualTo("TEST_COMMAND"));
