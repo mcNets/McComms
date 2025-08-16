@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using Grpc.Core;
 
 namespace McComms.gRPC.Tests;
 
@@ -7,6 +8,8 @@ namespace McComms.gRPC.Tests;
 public class GrpcServerTests
 {
     private readonly CancellationTokenSource _serverCts = new();
+
+    private readonly ServerCredentials _serverCredentials = ServerCredentials.Insecure;
 
     [OneTimeSetUp]
     public void OneTimeSetUp()
@@ -27,7 +30,7 @@ public class GrpcServerTests
     [Order(1)]
     public void Constructor_WithDefaultParameters_InitializesServerWithDefaultValues()
     {
-        var server = new GrpcServer();
+        var server = new GrpcServer(credentials: _serverCredentials);
         Assert.Multiple(() =>
         {
             Assert.That(server, Is.Not.Null);
@@ -43,7 +46,7 @@ public class GrpcServerTests
     {
         var host = "127.0.0.1";
         var port = 9001;
-        var server = new GrpcServer(host, port);
+        var server = new GrpcServer(host, port, _serverCredentials);
         Assert.Multiple(() =>
         {
             Assert.That(server, Is.Not.Null);
@@ -60,7 +63,7 @@ public class GrpcServerTests
         // Arrange
         var host = "127.0.0.1";
         var port = 9002;
-        var server = new GrpcServer(host, port);
+        var server = new GrpcServer(host, port, _serverCredentials);
         var mockCallback = new Func<Commsproto.mcCommandRequest, Commsproto.mcCommandResponse>(r => new Commsproto.mcCommandResponse());
 
         Assert.DoesNotThrow(() =>
@@ -76,7 +79,7 @@ public class GrpcServerTests
     {
         var host = "127.0.0.1";
         var port = 9003;
-        var server = new GrpcServer(host, port);
+        var server = new GrpcServer(host, port, _serverCredentials);
         Assert.DoesNotThrow(() => server.Stop());
     }
 
@@ -86,7 +89,7 @@ public class GrpcServerTests
     {
         var host = "127.0.0.1";
         var port = 9004;
-        var server = new GrpcServer(host, port);
+        var server = new GrpcServer(host, port, _serverCredentials);
         Assert.Throws<InvalidOperationException>(() => server.SendBroadcast(new Commsproto.mcBroadcast()));
         server.Stop();
     }
@@ -97,7 +100,7 @@ public class GrpcServerTests
     {
         var host = "127.0.0.1";
         var port = 9004;
-        var server = new GrpcServer(host, port);
+        var server = new GrpcServer(host, port, _serverCredentials);
         Assert.ThrowsAsync<InvalidOperationException>(async () => await server.SendBroadcastAsync(new Commsproto.mcBroadcast()));
         server.Stop();
     }
@@ -108,7 +111,7 @@ public class GrpcServerTests
     {
         var host = "127.0.0.1";
         var port = 9007;
-        var server = new GrpcServer(host, port);
+        var server = new GrpcServer(host, port, _serverCredentials);
         var mockCallback = new Func<Commsproto.mcCommandRequest, Commsproto.mcCommandResponse>(r => new Commsproto.mcCommandResponse());
         
         Assert.DoesNotThrow(() =>
@@ -125,7 +128,7 @@ public class GrpcServerTests
     {
         var host = "127.0.0.1";
         var port = 9008;
-        var server = new GrpcServer(host, port);
+        var server = new GrpcServer(host, port, _serverCredentials);
         
         Assert.DoesNotThrow(() =>
         {

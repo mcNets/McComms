@@ -3,17 +3,24 @@
 /// <summary>
 /// Implementation of ICommsServer based on gRPC.
 /// This class adapts the functionality of GrpcServer to the standard ICommsServer interface.
+/// In case you needed it, you can use ChannelOptions to add custom behavior to the gRPC server.
 /// </summary>
 public class CommsServerGrpc : ICommsServer
 {
-    // Internal gRPC server that handles communications
     private readonly GrpcServer _grpcServer;
+
+    /// <summary>
+    /// List of channel options for the gRPC server
+    /// </summary>
+    public List<ChannelOption> ChannelOptions { get; } = [];
+
+    public ServerCredentials Credentials { get; set; } = ServerCredentials.Insecure;
 
     /// <summary>
     /// Default constructor that initializes the server with default settings
     /// </summary>
     public CommsServerGrpc() {
-        _grpcServer = new GrpcServer();
+        _grpcServer = new GrpcServer(credentials: Credentials, channelOptions: ChannelOptions);
     }
 
     /// <summary>
@@ -22,12 +29,12 @@ public class CommsServerGrpc : ICommsServer
     /// <param name="host">Address where the server will listen</param>
     /// <param name="port">Port where the server will listen</param>
     public CommsServerGrpc(string host, int port) {
-        _grpcServer = new GrpcServer(host, port);
+        _grpcServer = new GrpcServer(host: host, port: port, credentials: Credentials, channelOptions: ChannelOptions);
     }
 
     /// <summary>
     /// Gets the underlying gRPC server instance
-    /// summary>
+    /// </summary>
     public CommsHost CommsHost => _grpcServer.CommsHost;
 
     /// <summary>

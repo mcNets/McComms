@@ -9,14 +9,13 @@ CancellationTokenSource cts = new CancellationTokenSource();
 ICommsServer? CommsServer = SelectServer();
 
 System.Timers.Timer timer = new System.Timers.Timer(1000);
-timer.Elapsed += (sender, e) =>
-{
+
+timer.Elapsed += (sender, e) => {
     string dateTime = "0:" + DateTime.Now.ToString();
     Console.WriteLine($"Broadcasting clock: {dateTime}");
 
     dateTime.TryParseBroadcastMessage(out var msg);
-    if (msg == null)
-    {
+    if (msg == null) {
         Console.WriteLine("Failed to create broadcast message.");
         return;
     }
@@ -26,17 +25,14 @@ timer.Elapsed += (sender, e) =>
 var token = cts.Token;
 CommsServer?.Start(OnCommandReceived, token);
 
-while (token.IsCancellationRequested == false)
-{
+while (token.IsCancellationRequested == false) {
     await Task.Delay(100, token);
 }
 
-CommandResponse OnCommandReceived(CommandRequest request)
-{
+CommandResponse OnCommandReceived(CommandRequest request) {
     Console.WriteLine($"Command received: {request}\n");
 
-    switch (request.Id)
-    {
+    switch (request.Id) {
         case 0:
             return MsgHelper.Ok("Command 0, OK");
         case 1:
@@ -58,22 +54,19 @@ CommandResponse OnCommandReceived(CommandRequest request)
     return MsgHelper.Fail("ERR01", "Command not found");
 }
 
-static ICommsServer SelectServer()
-{
+static ICommsServer SelectServer() {
     Console.WriteLine("Please select a protocol:");
     Console.WriteLine("0. Quit");
     Console.WriteLine("1. gRPC");
     Console.WriteLine("2. Sockets");
     Console.WriteLine("3. WebSockets");
 
-    while (true)
-    {
+    while (true) {
         Console.Write("Enter your selection: ");
 
         string? input = Console.ReadLine();
 
-        switch (input)
-        {
+        switch (input) {
             case "0":
                 Environment.Exit(0);
                 break;

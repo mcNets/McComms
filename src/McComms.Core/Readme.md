@@ -61,6 +61,7 @@ Class with methods for creating command responses:
 This core library is implemented by other projects in the solution:
 - McComms.gRPC: Implementation using gRPC.
 - McComms.Sockets: Implementation using TCP sockets.
+- McComms.WebSockets: Implementation using WebSockets.
 
 ## Author
 Joan Magnet

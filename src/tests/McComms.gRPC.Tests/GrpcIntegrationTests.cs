@@ -1,4 +1,5 @@
 using Commsproto;
+using Grpc.Core;
 using NUnit.Framework;
 using System.Collections.Concurrent;
 
@@ -9,18 +10,20 @@ namespace McComms.gRPC.Tests;
 public class GrpcIntegrationTests
 {
     // Base port number - each test will use BasePort + test order
-    private const int BasePort = 9000;
-    private int GetTestPort(int testOrder) => BasePort + testOrder;
+    private const int _basePort = 9000;
+    private int GetTestPort(int testOrder) => _basePort + testOrder;
 
-    private string Host = "127.0.0.1";
+    private readonly string _host = "127.0.0.1";
     //private CancellationTokenSource _serverCts = null!;
+
+    private readonly ServerCredentials _serverCredentials = ServerCredentials.Insecure;
 
     private GrpcServer _server = null!;
 
     [OneTimeSetUp]
     public async Task OneTimeSetup()
     {
-        _server = new GrpcServer(Host, BasePort);
+        _server = new GrpcServer(_host, _basePort, _serverCredentials);
         _server.Start(onCommandReceived: (request) =>
         {
             if (request.Id == 100)
@@ -49,7 +52,7 @@ public class GrpcIntegrationTests
     public void ClientServer_SingleClient_SendCommandReceivesResponse()
     {
         // Create and connect client
-        var client = new GrpcClient(Host, BasePort);
+        var client = new GrpcClient(_host, _basePort);
         var connected = client.Connect(onBroadcastReceived: (msg) => { 
             // Handle broadcast messages if needed
         });
@@ -77,7 +80,7 @@ public class GrpcIntegrationTests
     public async Task ClientServer_SingleClient_SendCommandAsyncReceivesResponse()
     {
         // Create and connect client
-        var client = new GrpcClient(Host, BasePort);
+        var client = new GrpcClient(_host, _basePort);
         var connected = await client.ConnectAsync(onBroadcastReceived: (msg) => { 
             // Handle broadcast messages if needed
         });
@@ -105,8 +108,8 @@ public class GrpcIntegrationTests
     public void ClientServer_MultipleClients_AllReceiveResponses()
     {
         // Create and connect multiple clients
-        var client1 = new GrpcClient(Host, BasePort);
-        var client2 = new GrpcClient(Host, BasePort);
+        var client1 = new GrpcClient(_host, _basePort);
+        var client2 = new GrpcClient(_host, _basePort);
 
         var connected1 = client1.Connect((_) => { });
         var connected2 = client2.Connect((_) => { });
@@ -142,8 +145,8 @@ public class GrpcIntegrationTests
     public async Task ClientServer_MultipleClientsAsync_AllReceiveResponses()
     {
         // Create and connect multiple clients
-        var client1 = new GrpcClient(Host, BasePort);
-        var client2 = new GrpcClient(Host, BasePort);
+        var client1 = new GrpcClient(_host, _basePort);
+        var client2 = new GrpcClient(_host, _basePort);
 
         var connected1 = await client1.ConnectAsync((_) => { });
         var connected2 = await client2.ConnectAsync((_) => { });
@@ -183,8 +186,8 @@ public class GrpcIntegrationTests
         var client2ReceivedMessages = new ConcurrentBag<mcBroadcast>();
 
         // Create and connect clients with broadcast handlers
-        var client1 = new GrpcClient(Host, BasePort);
-        var client2 = new GrpcClient(Host, BasePort);
+        var client1 = new GrpcClient(_host, _basePort);
+        var client2 = new GrpcClient(_host, _basePort);
 
         var connected1 = client1.Connect(msg => client1ReceivedMessages.Add(msg));
         var connected2 = client2.Connect(msg => client2ReceivedMessages.Add(msg));
@@ -229,7 +232,7 @@ public class GrpcIntegrationTests
     [Order(5)]
     public void ClientServer_Clients_ReceiveLongResponse()
     {
-        var client = new GrpcClient(Host, BasePort);
+        var client = new GrpcClient(_host, _basePort);
 
         var connected = client.Connect((_) => { });
 

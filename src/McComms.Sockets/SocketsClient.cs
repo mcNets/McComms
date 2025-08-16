@@ -493,7 +493,9 @@ public class SocketsClient : IDisposable {
         }        catch (Exception ex) {
             System.Diagnostics.Debug.WriteLine($"McComms.Socket ERROR disconnecting: {ex.Message}");
         }
-    }    /// <summary>
+    }
+
+    /// <summary>
     /// Disposes the client and disconnects from the server.
     /// </summary>
     public void Dispose() {
@@ -502,6 +504,7 @@ public class SocketsClient : IDisposable {
         _broadcastCts?.Dispose();
         _broadcastMsgBuffer?.Clear();
         _responseBuffer?.Clear();
+        _broadcastTask?.Dispose();
         _stream?.Dispose();
         _socket?.Dispose();
         GC.SuppressFinalize(this);

@@ -2,6 +2,10 @@
 
 gRPC implementation for the McComms solution. This package provides gRPC-based implementations of the ICommsClient and ICommsServer interfaces from McComms.Core.
 
+>NOTE:
+>
+>**gRPC over HTTP/2 is not natively supported by most browsers due to limitations in browser APIs and the lack of full HTTP/2 support for custom protocols. As a result, this package cannot be used directly from web applications running in browsers, and it does not support Cross-Origin Resource Sharing (CORS). For browser-based scenarios, consider using gRPC-Web or a REST API instead, or the WebSockets implementation in McComms.WebSockets.**
+
 ## gRPC Communication Model
 
 gRPC uses Protocol Buffers (protobuf) for efficient serialization and HTTP/2 for transport.
@@ -36,6 +40,7 @@ message mcBroadcast {
 }
 
 message Empty {}
+
 ```
 
 ### Command Flow
