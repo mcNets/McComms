@@ -543,7 +543,7 @@ public class CommsSocketsIntegrationTests
 
     [Test]
     [Order(13)]
-    public async Task ConnectionFailure_ServerUnavailable_HandlesGracefully()
+    public void ConnectionFailure_ServerUnavailable_HandlesGracefully()
     {
         const int unavailablePort = 9999; // Use a port that's unlikely to be in use
         var client = new CommsClientSockets(IPAddress.Parse(_host), unavailablePort);

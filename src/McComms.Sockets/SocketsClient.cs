@@ -41,9 +41,6 @@ public class SocketsClient : IDisposable {
     
     // Semaphore for synchronizing send operations (only for send, not broadcast)
     private readonly SemaphoreSlim _sendSemaphore = new(1, 1);
-    
-    // Flag to indicate if a message is being sent (kept for compatibility but may not be needed)
-    private volatile bool _isSending = false;
 
     // CommsHost object for host and port information
     private readonly CommsHost? _commsHost;
@@ -180,9 +177,8 @@ public class SocketsClient : IDisposable {
         }
 
         try {
-            // Set sending flag and acquire send semaphore to prevent concurrent sends
+            // Acquire send semaphore to prevent concurrent sends
             _sendSemaphore.Wait();
-            _isSending = true;
             bool hasResponse = false;
 
             // Send the message
@@ -239,9 +235,8 @@ public class SocketsClient : IDisposable {
             throw;
         }
         finally {
-            // Reset sending flag and release send semaphore
+            // Release send semaphore
             _sendSemaphore.Release();
-            _isSending = false;
         }
     }
 
@@ -266,9 +261,8 @@ public class SocketsClient : IDisposable {
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(timeOutCts.Token, cancellationToken);
         var combinedToken = linkedCts.Token;
         try {
-            // Set sending flag and acquire send semaphore
+            // Acquire send semaphore
             await _sendSemaphore.WaitAsync(combinedToken);
-            _isSending = true;
 
             // Send the message
             await _stream!.WriteAsync(message, combinedToken);
@@ -334,8 +328,7 @@ public class SocketsClient : IDisposable {
             throw;
         }
         finally {
-            // Reset sending flag and release send semaphore
-            _isSending = false;
+            // Release send semaphore
             _sendSemaphore.Release();
         }
     }
