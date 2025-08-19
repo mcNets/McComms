@@ -39,10 +39,10 @@ public class SocketsClient : IDisposable {
     // Poll delay in milliseconds to avoid busy waiting
     private readonly int _pollDelayMs;
     
-    // ManualResetEvent for synchronizing broadcast message handling
-    private readonly SemaphoreSlim _broadcastSemaphore = new(1, 1);
+    // Semaphore for synchronizing send operations (only for send, not broadcast)
+    private readonly SemaphoreSlim _sendSemaphore = new(1, 1);
     
-    // Flag to indicate if a message is being sent
+    // Flag to indicate if a message is being sent (kept for compatibility but may not be needed)
     private volatile bool _isSending = false;
 
     // CommsHost object for host and port information
@@ -180,8 +180,8 @@ public class SocketsClient : IDisposable {
         }
 
         try {
-            // Set sending flag and acquire semaphore to prevent conflicts with broadcast receiving
-            _broadcastSemaphore.Wait();
+            // Set sending flag and acquire send semaphore to prevent concurrent sends
+            _sendSemaphore.Wait();
             _isSending = true;
             bool hasResponse = false;
 
@@ -239,8 +239,8 @@ public class SocketsClient : IDisposable {
             throw;
         }
         finally {
-            // Reset sending flag and release semaphore
-            _broadcastSemaphore.Release();
+            // Reset sending flag and release send semaphore
+            _sendSemaphore.Release();
             _isSending = false;
         }
     }
@@ -266,8 +266,8 @@ public class SocketsClient : IDisposable {
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(timeOutCts.Token, cancellationToken);
         var combinedToken = linkedCts.Token;
         try {
-            // Set sending flag and acquire semaphore
-            await _broadcastSemaphore.WaitAsync(combinedToken);
+            // Set sending flag and acquire send semaphore
+            await _sendSemaphore.WaitAsync(combinedToken);
             _isSending = true;
 
             // Send the message
@@ -334,9 +334,9 @@ public class SocketsClient : IDisposable {
             throw;
         }
         finally {
-            // Reset sending flag and release semaphore
+            // Reset sending flag and release send semaphore
             _isSending = false;
-            _broadcastSemaphore.Release();
+            _sendSemaphore.Release();
         }
     }
 
@@ -356,62 +356,49 @@ public class SocketsClient : IDisposable {
             bool receivingMessage = false;
 
             while (_socket.Connected && !cancellationToken.IsCancellationRequested) {
-                // Skip processing if we're currently sending a message
-                if (_isSending) {
-                    await Task.Delay(_pollDelayMs, cancellationToken);
-                    continue;
-                }
-
-                // Try to acquire the semaphore to prevent conflicts with send/broadcast operations
-                if (await _broadcastSemaphore.WaitAsync(100, cancellationToken)) {
+                // Process broadcast messages independently of send operations
+                if (_stream!.DataAvailable) {
+                    // Create a linked cancellation token with timeout
+                    using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    timeoutCts.CancelAfter(_readTimeoutMs);
+                    
+                    int bytesRead;
                     try {
-                        if (_stream!.DataAvailable) {
-                            // Create a linked cancellation token with timeout
-                            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                            timeoutCts.CancelAfter(_readTimeoutMs);
-                            
-                            int bytesRead;
-                            try {
-                                bytesRead = await _stream.ReadAsync(buffer, timeoutCts.Token);
-                                if (bytesRead <= 0 || cancellationToken.IsCancellationRequested) {
-                                    continue;
-                                }
-                            }
-                            catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested) {
-                                // Just log the timeout and continue, as broadcast reading is continuous
-                                System.Diagnostics.Debug.WriteLine($"Broadcast read operation timed out after {_readTimeoutMs} ms");
-                                continue;
-                            }
-
-                            bool foundSTX = false;
-                            for (int x = 0; x < bytesRead; x++) {
-                                if (!foundSTX) {
-                                    if (buffer[x] == SocketsHelper.STX) {
-                                        foundSTX = true;
-                                        _broadcastMsgBuffer.Clear();
-                                        receivingMessage = true;
-                                        posBuffer = 0;
-                                    }
-                                    // Ignore all bytes before STX
-                                    continue;
-                                }
-                                if (buffer[x] == SocketsHelper.ETX && receivingMessage && posBuffer > 0) {
-                                    OnMessageReceived?.Invoke(CollectionsMarshal.AsSpan(_broadcastMsgBuffer));
-                                    receivingMessage = false;
-                                    _broadcastMsgBuffer.Clear();
-                                    posBuffer = 0;
-                                    foundSTX = false;
-                                    continue;
-                                }
-                                if (receivingMessage) {
-                                    _broadcastMsgBuffer.Add(buffer[x]);
-                                    posBuffer++;
-                                }
-                            }
+                        bytesRead = await _stream.ReadAsync(buffer, timeoutCts.Token);
+                        if (bytesRead <= 0 || cancellationToken.IsCancellationRequested) {
+                            continue;
                         }
                     }
-                    finally {
-                        _broadcastSemaphore.Release();
+                    catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested) {
+                        // Just log the timeout and continue, as broadcast reading is continuous
+                        System.Diagnostics.Debug.WriteLine($"Broadcast read operation timed out after {_readTimeoutMs} ms");
+                        continue;
+                    }
+
+                    bool foundSTX = false;
+                    for (int x = 0; x < bytesRead; x++) {
+                        if (!foundSTX) {
+                            if (buffer[x] == SocketsHelper.STX) {
+                                foundSTX = true;
+                                _broadcastMsgBuffer.Clear();
+                                receivingMessage = true;
+                                posBuffer = 0;
+                            }
+                            // Ignore all bytes before STX
+                            continue;
+                        }
+                        if (buffer[x] == SocketsHelper.ETX && receivingMessage && posBuffer > 0) {
+                            OnMessageReceived?.Invoke(CollectionsMarshal.AsSpan(_broadcastMsgBuffer));
+                            receivingMessage = false;
+                            _broadcastMsgBuffer.Clear();
+                            posBuffer = 0;
+                            foundSTX = false;
+                            continue;
+                        }
+                        if (receivingMessage) {
+                            _broadcastMsgBuffer.Add(buffer[x]);
+                            posBuffer++;
+                        }
                     }
                 }
 
@@ -457,6 +444,9 @@ public class SocketsClient : IDisposable {
                 _socket?.Disconnect(false);
                 _socket?.Close();
             }
+            
+            // Clear event handlers to prevent memory leaks
+            OnMessageReceived = null;
         }
         catch (Exception ex) {
             System.Diagnostics.Debug.WriteLine($"McComms.Socket ERROR disconnecting: {ex.Message}");
@@ -490,7 +480,11 @@ public class SocketsClient : IDisposable {
                 _socket.Disconnect(false);
                 _socket?.Close();
             }
-        }        catch (Exception ex) {
+            
+            // Clear event handlers to prevent memory leaks
+            OnMessageReceived = null;
+        }
+        catch (Exception ex) {
             System.Diagnostics.Debug.WriteLine($"McComms.Socket ERROR disconnecting: {ex.Message}");
         }
     }
@@ -500,11 +494,15 @@ public class SocketsClient : IDisposable {
     /// </summary>
     public void Dispose() {
         Disconnect();
-        _broadcastSemaphore?.Dispose();
+        
+        // Clear event handlers
+        OnMessageReceived = null;
+        
+        _sendSemaphore?.Dispose();
         _broadcastCts?.Dispose();
         _broadcastMsgBuffer?.Clear();
         _responseBuffer?.Clear();
-        _broadcastTask?.Dispose();
+        // Don't dispose the task - just let it be collected by GC
         _stream?.Dispose();
         _socket?.Dispose();
         GC.SuppressFinalize(this);

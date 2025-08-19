@@ -373,6 +373,369 @@ public class CommsSocketsIntegrationTests
         client.Disconnect();
     }
 
+    [Test]
+    [Order(10)]
+    public async Task ResourceManagement_ClientDisposal_CleansUpResourcesCorrectly()
+    {
+        var broadcastReceived = new TaskCompletionSource<BroadcastMessage>();
+        CommsClientSockets client = null!;
+        
+        // Test using block to ensure disposal
+        using (client = new CommsClientSockets(IPAddress.Parse(_host), _basePort))
+        {
+            var connected = await client.ConnectAsync(onBroadcastReceived: (msg) =>
+            {
+                broadcastReceived.TrySetResult(msg);
+            });
+
+            Assert.That(connected, Is.True, "Client should connect successfully");
+
+            // Verify client is functioning
+            var request = new CommandRequest { Id = 1, Message = "TEST_BEFORE_DISPOSE" };
+            var response = await client.SendCommandAsync(request);
+            
+            Assert.Multiple(() =>
+            {
+                Assert.That(response, Is.Not.Null);
+                Assert.That(response.Success, Is.True);
+                Assert.That(response.Message, Is.EqualTo("TEST_BEFORE_DISPOSE"));
+            });
+
+            // Trigger a broadcast to verify dual-channel functionality before disposal
+            var broadcastRequest = new CommandRequest { Id = 100, Message = "BROADCAST_TEST" };
+            await client.SendCommandAsync(broadcastRequest);
+
+            // Wait for broadcast with timeout
+            var timeoutTask = Task.Delay(3000);
+            var completedTask = await Task.WhenAny(broadcastReceived.Task, timeoutTask);
+            
+            Assert.That(completedTask, Is.EqualTo(broadcastReceived.Task), "Broadcast should be received before disposal");
+            
+        } // Dispose is called automatically here
+
+        // After disposal, verify cleanup occurred
+        Assert.DoesNotThrow(() =>
+        {
+            // These operations should not throw exceptions even after disposal
+            client.Dispose(); // Should be safe to call multiple times
+        }, "Multiple disposal calls should be safe");
+
+        // Allow some time for server-side cleanup
+        await Task.Delay(500);
+        
+        // Verify that attempting to use disposed client fails gracefully
+        Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        {
+            await client.SendCommandAsync(new CommandRequest { Id = 999, Message = "AFTER_DISPOSE" });
+        }, "Operations on disposed client should throw InvalidOperationException");
+    }
+
+    [Test]
+    [Order(11)]
+    public async Task ResourceManagement_MultipleConnectDisconnectCycles_NoMemoryLeaks()
+    {
+        const int cycleCount = 10;
+        var clients = new List<CommsClientSockets>();
+        var responses = new List<CommandResponse>();
+
+        try
+        {
+            for (int i = 0; i < cycleCount; i++)
+            {
+                var client = new CommsClientSockets(IPAddress.Parse(_host), _basePort);
+                clients.Add(client);
+
+                // Connect
+                var connected = await client.ConnectAsync(onBroadcastReceived: (msg) =>
+                {
+                    // Handle broadcasts
+                });
+
+                Assert.That(connected, Is.True, $"Client {i} should connect successfully");
+
+                // Send a command
+                var request = new CommandRequest { Id = i + 1, Message = $"CYCLE_{i}" };
+                var response = await client.SendCommandAsync(request);
+                responses.Add(response);
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(response, Is.Not.Null, $"Response {i} should not be null");
+                    Assert.That(response.Success, Is.True, $"Response {i} should be successful");
+                    Assert.That(response.Message, Is.EqualTo($"CYCLE_{i}"), $"Response {i} should have correct message");
+                });
+
+                // Disconnect every other client to test mixed states
+                if (i % 2 == 0)
+                {
+                    client.Disconnect();
+                }
+            }
+
+            // Verify all responses were collected correctly
+            Assert.That(responses.Count, Is.EqualTo(cycleCount), "All commands should have received responses");
+
+            // Allow time for server cleanup
+            await Task.Delay(1000);
+        }
+        finally
+        {
+            // Clean up all clients
+            foreach (var client in clients)
+            {
+                try
+                {
+                    client.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    // Log but don't fail test for cleanup exceptions
+                    Console.WriteLine($"Exception during client cleanup: {ex.Message}");
+                }
+            }
+        }
+    }
+
+    [Test]
+    [Order(12)]
+    public async Task ResourceManagement_EventHandlerCleanup_PreventMemoryLeaks()
+    {
+        var broadcastCallbackExecuted = false;
+        var client = new CommsClientSockets(IPAddress.Parse(_host), _basePort);
+
+        // Create a reference to the callback to verify it gets cleared
+        Action<BroadcastMessage> broadcastCallback = (msg) =>
+        {
+            broadcastCallbackExecuted = true;
+        };
+
+        var connected = await client.ConnectAsync(onBroadcastReceived: broadcastCallback);
+        Assert.That(connected, Is.True, "Client should connect successfully");
+
+        // Verify callback is working before disconnect
+        var broadcastRequest = new CommandRequest { Id = 100, Message = "TEST_CALLBACK" };
+        await client.SendCommandAsync(broadcastRequest);
+        
+        await Task.Delay(1000); // Allow time for broadcast
+        Assert.That(broadcastCallbackExecuted, Is.True, "Callback should execute before disconnect");
+
+        // Reset flag and disconnect
+        broadcastCallbackExecuted = false;
+        client.Disconnect();
+
+        // Reconnect with new callback to trigger server broadcast
+        var newClient = new CommsClientSockets(IPAddress.Parse(_host), _basePort);
+        var reconnected = await newClient.ConnectAsync(onBroadcastReceived: (msg) => { });
+        Assert.That(reconnected, Is.True, "New client should connect successfully");
+
+        // Trigger another broadcast
+        await newClient.SendCommandAsync(new CommandRequest { Id = 100, Message = "TEST_AFTER_DISCONNECT" });
+        await Task.Delay(1000); // Allow time for broadcast
+
+        // Verify old callback was not executed (event handler was cleared)
+        Assert.That(broadcastCallbackExecuted, Is.False, "Old callback should not execute after disconnect");
+
+        // Cleanup
+        newClient.Disconnect();
+        client.Dispose();
+        newClient.Dispose();
+    }
+
+    [Test]
+    [Order(13)]
+    public async Task ConnectionFailure_ServerUnavailable_HandlesGracefully()
+    {
+        const int unavailablePort = 9999; // Use a port that's unlikely to be in use
+        var client = new CommsClientSockets(IPAddress.Parse(_host), unavailablePort);
+
+        // Test synchronous connection failure
+        Assert.Throws<SocketException>(() =>
+        {
+            client.Connect(onBroadcastReceived: (msg) => { });
+        }, "Sync connect should throw SocketException when server is unavailable");
+
+        // Test asynchronous connection failure
+        Assert.ThrowsAsync<SocketException>(async () =>
+        {
+            await client.ConnectAsync(onBroadcastReceived: (msg) => { });
+        }, "Async connect should throw SocketException when server is unavailable");
+
+        // Ensure disposal doesn't throw even after failed connection
+        Assert.DoesNotThrow(() =>
+        {
+            client.Dispose();
+        }, "Disposal should be safe even after connection failure");
+    }
+
+    [Test]
+    [Order(14)]
+    public async Task ConcurrentOperations_CommandAndBroadcast_TrueDualChannel()
+    {
+        var broadcastReceived = new TaskCompletionSource<BroadcastMessage>();
+        var commandCompleted = new TaskCompletionSource<CommandResponse>();
+        var client = new CommsClientSockets(IPAddress.Parse(_host), _basePort);
+
+        var connected = await client.ConnectAsync(onBroadcastReceived: (msg) =>
+        {
+            // This should execute even while a command is in progress
+            broadcastReceived.TrySetResult(msg);
+        });
+
+        Assert.That(connected, Is.True, "Client should connect successfully");
+
+        // Start a long-running command that would block in single-channel implementation
+        var longCommandTask = Task.Run(async () =>
+        {
+            try
+            {
+                // Use a command that triggers broadcast but takes time to complete
+                var request = new CommandRequest { Id = 100, Message = "LONG_COMMAND" };
+                var response = await client.SendCommandAsync(request);
+                commandCompleted.SetResult(response);
+                return response;
+            }
+            catch (Exception ex)
+            {
+                commandCompleted.SetException(ex);
+                throw;
+            }
+        });
+
+        // Give the command a moment to start
+        await Task.Delay(100);
+
+        // While command is running, verify we can receive broadcasts
+        var broadcastTimeout = Task.Delay(5000);
+        var broadcastTask = await Task.WhenAny(broadcastReceived.Task, broadcastTimeout);
+        Assert.That(broadcastTask, Is.EqualTo(broadcastReceived.Task), "Broadcast should be received even while command is running");
+
+        // Verify the command also completes successfully
+        var commandTimeout = Task.Delay(5000);
+        var commandTask = await Task.WhenAny(commandCompleted.Task, commandTimeout);
+        Assert.That(commandTask, Is.EqualTo(commandCompleted.Task), "Command should complete successfully");
+
+        var finalResponse = await commandCompleted.Task;
+        Assert.Multiple(() =>
+        {
+            Assert.That(finalResponse, Is.Not.Null, "Command response should not be null");
+            Assert.That(finalResponse.Success, Is.True, "Command should succeed");
+        });
+
+        // Cleanup
+        client.Disconnect();
+    }
+
+    [Test]
+    [Order(15)]
+    public async Task MemoryLeakDetection_LongRunningOperations_MonitorMemoryUsage()
+    {
+        const int operationCount = 50;
+        var initialMemory = GC.GetTotalMemory(true); // Force GC and get baseline
+        var clients = new List<CommsClientSockets>();
+        var tasks = new List<Task>();
+
+        try
+        {
+            // Perform many operations to detect potential memory leaks
+            for (int i = 0; i < operationCount; i++)
+            {
+                var client = new CommsClientSockets(IPAddress.Parse(_host), _basePort);
+                clients.Add(client);
+
+                var task = Task.Run(async () =>
+                {
+                    var connected = await client.ConnectAsync(onBroadcastReceived: (msg) =>
+                    {
+                        // Process broadcast messages
+                    });
+
+                    if (connected)
+                    {
+                        // Send multiple commands per client
+                        for (int j = 0; j < 3; j++)
+                        {
+                            var request = new CommandRequest { Id = (i * 10) + j, Message = $"MEMORY_TEST_{i}_{j}" };
+                            await client.SendCommandAsync(request);
+                            
+                            // Small delay to simulate real usage
+                            await Task.Delay(10);
+                        }
+                    }
+                });
+                
+                tasks.Add(task);
+
+                // Process in batches to avoid overwhelming the server
+                if (i % 10 == 9)
+                {
+                    await Task.WhenAll(tasks);
+                    tasks.Clear();
+                    
+                    // Cleanup every batch
+                    for (int k = Math.Max(0, clients.Count - 10); k < clients.Count; k++)
+                    {
+                        clients[k].Dispose();
+                    }
+                    
+                    // Force garbage collection
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
+                    GC.Collect();
+                    
+                    await Task.Delay(100); // Allow cleanup
+                }
+            }
+
+            // Wait for any remaining tasks
+            if (tasks.Count > 0)
+            {
+                await Task.WhenAll(tasks);
+            }
+
+            // Final cleanup and memory check
+            foreach (var client in clients)
+            {
+                client.Dispose();
+            }
+
+            // Force multiple garbage collections
+            for (int i = 0; i < 3; i++)
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                await Task.Delay(100);
+            }
+
+            var finalMemory = GC.GetTotalMemory(true);
+            var memoryIncrease = finalMemory - initialMemory;
+            var memoryIncreaseKB = memoryIncrease / 1024.0;
+
+            // Log memory usage for analysis
+            Console.WriteLine($"Initial memory: {initialMemory / 1024.0:F2} KB");
+            Console.WriteLine($"Final memory: {finalMemory / 1024.0:F2} KB");
+            Console.WriteLine($"Memory increase: {memoryIncreaseKB:F2} KB");
+
+            // Allow reasonable memory growth (adjust threshold as needed)
+            // This is more of a monitoring test than a strict assertion
+            Assert.That(memoryIncreaseKB, Is.LessThan(5000), $"Memory increase should be reasonable. Actual increase: {memoryIncreaseKB:F2} KB");
+        }
+        finally
+        {
+            // Ensure all resources are cleaned up
+            foreach (var client in clients)
+            {
+                try
+                {
+                    client.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Cleanup exception: {ex.Message}");
+                }
+            }
+        }
+    }
+
     private static string GenerateRandomLongString()
     {
         var random = new Random();

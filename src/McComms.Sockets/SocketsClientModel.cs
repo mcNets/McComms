@@ -4,7 +4,7 @@
 /// Represents a client model for socket communications.
 /// Encapsulates a client socket and its associated network stream.
 /// </summary>
-public class SocketsClientModel {
+public class SocketsClientModel : IDisposable {
     private readonly Socket _clientSocket;
 
     private readonly NetworkStream _stream;
@@ -47,4 +47,42 @@ public class SocketsClientModel {
     /// Gets or sets the unique identifier for the client.
     /// </summary>
     public int Id { get; set; } = 0;
+
+    /// <summary>
+    /// Disposes of the client resources including socket and stream.
+    /// </summary>
+    public void Dispose() {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Protected dispose method for proper resource cleanup.
+    /// </summary>
+    /// <param name="disposing">True if disposing managed resources.</param>
+    protected virtual void Dispose(bool disposing) {
+        if (disposing) {
+            try {
+                // Mark as disconnected first
+                Connected = false;
+                
+                // Close and dispose the stream
+                _stream?.Close();
+                _stream?.Dispose();
+                
+                // Close and dispose the socket
+                if (_clientSocket?.Connected == true) {
+                    _clientSocket.Shutdown(SocketShutdown.Both);
+                }
+                _clientSocket?.Close();
+                _clientSocket?.Dispose();
+                
+                // Clear the message buffer
+                MessageBuffer?.Clear();
+            }
+            catch (Exception ex) {
+                System.Diagnostics.Debug.WriteLine($"Error disposing SocketsClientModel: {ex.Message}");
+            }
+        }
+    }
 }
