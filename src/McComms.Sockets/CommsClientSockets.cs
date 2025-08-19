@@ -82,12 +82,12 @@ public class CommsClientSockets : ICommsClient, IDisposable {
     public CommandResponse SendCommand(CommandRequest msg) {
         var result = _client.Send(SocketsHelper.Encode(msg.ToString()));
         if (result == SocketsHelper.NAK_MSG) {
-            return MsgHelper.Fail("SCK001", "NAK received");
+            return new CommandResponse(false, "SCK001", "NAK received");
         }
 
         var decoded = SocketsHelper.Decode(result);
         if (decoded.TryParseCommandResponse(out var response) == false || response == null) {
-            return MsgHelper.Fail("SCK002", "Invalid response");
+            return new CommandResponse(false, "SCK002", "Invalid response");
         }
         return response;
     }
@@ -101,12 +101,12 @@ public class CommsClientSockets : ICommsClient, IDisposable {
     public async Task<CommandResponse> SendCommandAsync(CommandRequest msg, CancellationToken cancellationToken = default) {
         var result = await _client.SendAsync(SocketsHelper.Encode(msg.ToString()), cancellationToken);
         if (result == SocketsHelper.NAK_MSG) {
-            return MsgHelper.Fail("SCK001", "NAK received");
+            return new CommandResponse(false, "SCK001", "NAK received");
         }
 
         var decoded = SocketsHelper.Decode(result);
         if (decoded.TryParseCommandResponse(out var response) == false || response == null) {
-            return MsgHelper.Fail("SCK002", "Invalid response");
+            return new CommandResponse(false, "SCK002", "Invalid response");
         }
         return response;
     }

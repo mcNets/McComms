@@ -76,10 +76,10 @@ public class CommsServerSockets : ICommsServer {
     private byte[] OnCommandReceived(byte[] response) {
         var cmd = SocketsHelper.Decode(response);
         if (cmd.TryParseCommandRequest(out var request) == false || request == null) {
-            return SocketsHelper.Encode(MsgHelper.Fail().ToString());
+            return SocketsHelper.Encode(new CommandResponse(false, string.Empty, string.Empty).ToString());
         }
         var result = CommandReceived?.Invoke(request);
-        var encoded = result?.ToString() ?? MsgHelper.Fail().ToString();
+        var encoded = result?.ToString() ?? new CommandResponse(false, string.Empty, string.Empty).ToString();
         return SocketsHelper.Encode(encoded);
     }
 }
