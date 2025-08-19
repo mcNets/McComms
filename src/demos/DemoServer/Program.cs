@@ -34,7 +34,7 @@ CommandResponse OnCommandReceived(CommandRequest request) {
 
     switch (request.Id) {
         case 0:
-            return MsgHelper.Ok("Command 0, OK");
+            return new CommandResponse(true, request.Id.ToString(), "Command 0, OK");
         case 1:
             string msg = """
                 0 -> Returns Ok.
@@ -42,16 +42,16 @@ CommandResponse OnCommandReceived(CommandRequest request) {
                 2 -> Starts broadcast clock.
                 3 -> Stops broadcast clock.
                 """;
-            return MsgHelper.Ok(msg);
+            return new CommandResponse(true, request.Id.ToString(), msg);
         case 2:
             timer.Start();
-            return MsgHelper.Ok("Broadcast clock started.");
+            return new CommandResponse(true, request.Id.ToString(), "Broadcast clock started.");
         case 3:
             timer.Stop();
-            return MsgHelper.Ok("Broadcast clock stopped.");
+            return new CommandResponse(true, request.Id.ToString(), "Broadcast clock stopped.");
     }
 
-    return MsgHelper.Fail("ERR01", "Command not found");
+    return new CommandResponse(false, "ERR01", "Command not found");
 }
 
 static ICommsServer SelectServer() {
