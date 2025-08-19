@@ -84,6 +84,34 @@ public class SocketsServer : IDisposable {
     public CommsHost CommsHost => _commsHost ?? throw new InvalidOperationException("CommsHost is not initialized.");
 
     /// <summary>
+    /// Removes a specific disconnected client from the collection immediately.
+    /// </summary>
+    /// <param name="clientToRemove">The client to remove and dispose.</param>
+    private async Task RemoveClientAsync(SocketsClientModel clientToRemove) {
+        await _messageProcessingLock.WaitAsync();
+        try {
+            // Create new collection without the disconnected client
+            var remainingClients = _clients.Where(c => c != clientToRemove && c.Connected).ToArray();
+            _clients.Clear();
+            foreach (var client in remainingClients) {
+                _clients.Add(client);
+            }
+
+            // Dispose the removed client
+            try {
+                clientToRemove.Dispose();
+                Debug.WriteLine($"Client {clientToRemove.Id} removed and disposed, remaining clients: {_clients.Count}");
+            }
+            catch (Exception ex) {
+                Debug.WriteLine($"Error disposing removed client {clientToRemove.Id}: {ex.Message}");
+            }
+        }
+        finally {
+            _messageProcessingLock.Release();
+        }
+    }
+
+    /// <summary>
     /// Starts listening for incoming client connections and processes their messages asynchronously.
     /// </summary>
     /// <param name="onMessageReceived">Callback function invoked when a message is received from a client.</param>
@@ -159,24 +187,30 @@ public class SocketsServer : IDisposable {
                 }
             }
 
-            if (clientsToRemove.Count > 10 || (_clients.Count > 0 && clientsToRemove.Count > _clients.Count * 0.1)) {
+            // Immediate cleanup - don't wait for threshold
+            if (clientsToRemove.Count > 0) {
                 foreach (var client in clientsToRemove) {
                     try {
-                        client.Stream?.Close();
-                        client.ClientSocket?.Close();
+                        // Properly dispose of client resources
+                        client.Dispose();
                     }
-                    catch { }
+                    catch (Exception ex) {
+                        Debug.WriteLine($"Error disposing client: {ex.Message}");
+                    }
                 }
 
+                // Remove disconnected clients immediately
                 var connectedClients = _clients.Where(c => c.Connected).ToArray();
                 _clients.Clear();
                 foreach (var client in connectedClients) {
                     _clients.Add(client);
                 }
+
+                Debug.WriteLine($"{clientsToRemove.Count} client(s) removed immediately, remaining clients: {_clients.Count}");
             }
 
             if (disconnectedCount > 0) {
-                Debug.WriteLine($"{disconnectedCount} client(s) marked as disconnected, total clients in collection: {_clients.Count}");
+                Debug.WriteLine($"{disconnectedCount} client(s) marked as disconnected and cleaned up");
             }
         }
         finally {
@@ -216,7 +250,8 @@ public class SocketsServer : IDisposable {
                                 byte[] ack = SocketsHelper.Encode("0:0");
                                 await client.Stream.WriteAsync(ack, cancellationToken);
                                 client.Connected = false;
-                                break;
+                                // Client will be removed in finally block
+                                return; // Exit the message handler
                             case SocketsHelper.STX:
                                 // Start of new message
                                 bufferMessage.Clear();
@@ -262,10 +297,9 @@ public class SocketsServer : IDisposable {
             // Return the buffer to the ArrayPool to avoid memory leaks
             ArrayPool<byte>.Shared.Return(buffer);
             
-            // Just ensure client is marked as disconnected
-            // No need to remove from the collection
-            client.Connected = false;
-            Debug.WriteLine($"Client disconnected, total clients in collection: {_clients.Count}");
+            // Immediately remove and dispose this client from the collection
+            _ = Task.Run(async () => await RemoveClientAsync(client));
+            Debug.WriteLine($"Client {client.Id} disconnected and scheduled for removal");
         }
     }
 
@@ -297,13 +331,11 @@ public class SocketsServer : IDisposable {
             foreach (var client in _clients) {
                 try {
                     if (client.Connected) {
-                        client.Connected = false;
-                        client.Stream?.Close();
-                        client.ClientSocket?.Close();
+                        client.Dispose();
                     }
                 }
                 catch (Exception ex) {
-                    Debug.WriteLine($"Error closing client connection: {ex.Message}");
+                    Debug.WriteLine($"Error disposing client connection: {ex.Message}");
                 }
             }
 

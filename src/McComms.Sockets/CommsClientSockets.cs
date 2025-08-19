@@ -4,7 +4,7 @@
 /// Socket implementation of the ICommsClient interface.
 /// Provides client-side functionality for socket-based communications.
 /// </summary>
-public class CommsClientSockets : ICommsClient {
+public class CommsClientSockets : ICommsClient, IDisposable {
     private readonly SocketsClient _client;
 
     /// <summary>
@@ -57,6 +57,10 @@ public class CommsClientSockets : ICommsClient {
         if (_client.IsConnected){
             SendExitCommand();
         }
+        
+        // Clear event handlers to prevent memory leaks
+        OnBroadcastReceived = null;
+        
         _client.Dispose();
     }
 
@@ -121,5 +125,13 @@ public class CommsClientSockets : ICommsClient {
     /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task SendExitCommandAsync(CancellationToken cancellationToken = default) {
         await _client.SendAsync(SocketsHelper.EOT_MSG, cancellationToken);
+    }
+
+    /// <summary>
+    /// Disposes the client and clears event handlers.
+    /// </summary>
+    public void Dispose() {
+        Disconnect();
+        GC.SuppressFinalize(this);
     }
 }
