@@ -8,6 +8,7 @@ CancellationTokenSource cts = new CancellationTokenSource();
 
 ICommsServer? CommsServer = SelectServer();
 
+
 System.Timers.Timer timer = new System.Timers.Timer(1000);
 
 timer.Elapsed += (sender, e) => {

@@ -8,7 +8,7 @@ namespace McComms.gRPC;
 /// </summary>
 public class GrpcClient : IDisposable, IAsyncDisposable {
     // Default host and port
-    public const string DEFAULT_HOST = "0.0.0.0";
+    public const string DEFAULT_HOST = "localhost";
     public const int DEFAULT_PORT = 50051;
 
     private readonly Channel? _channel;

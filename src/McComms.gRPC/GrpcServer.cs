@@ -8,8 +8,8 @@ using System.Diagnostics;
 /// </summary>
 public class GrpcServer : mcServeis.mcServeisBase {
     // Default host and port for the server
-    public const string DEFAULT_HOST = "127.0.0.1";
-    public const int DEFAULT_PORT = 50001;
+    public const string DEFAULT_HOST = "localhost";
+    public const int DEFAULT_PORT = 50051;
 
     private readonly List<IServerStreamWriter<mcBroadcast>> _broadcastWriters;
     private readonly Server? _server;
