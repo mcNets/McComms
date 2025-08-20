@@ -185,7 +185,8 @@ public class SocketsClient : IDisposable {
             _stream!.Write(message);
 
             // Get a buffer from the ArrayPool
-            byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(MAX_BUFFER_SIZE);            try {
+            byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(MAX_BUFFER_SIZE);
+            try {
                 // Wait for the response
                 int posBuffer = -1;
                 bool foundSTX = false;
@@ -194,7 +195,7 @@ public class SocketsClient : IDisposable {
                 while (!hasResponse) {
                     var bytesRead = _stream.Read(buffer, 0, buffer.Length);
                     if (bytesRead == 0) {
-                        throw new Exception("No data received");
+                        continue;
                     }
 
                     for (int x = 0; x < bytesRead; x++) {
@@ -279,7 +280,7 @@ public class SocketsClient : IDisposable {
                 while (!hasResponse && !combinedToken.IsCancellationRequested) {
                     var bytesRead = await _stream.ReadAsync(buffer, combinedToken);
                     if (bytesRead == 0) {
-                        throw new Exception("No data received");
+                        continue;
                     }
 
                     for (int x = 0; x < bytesRead; x++) {
