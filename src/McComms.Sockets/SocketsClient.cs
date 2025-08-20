@@ -3,11 +3,9 @@
 namespace McComms.Sockets;
 
 /// <summary>
-/// NOT OPTIMIZED FOR CONCURRENCY
-/// Methods: Send, SendAsync and WaitBroadcastMessageAsync use a unique buffer instead of generating a new one each time.
-/// 
 /// SocketsClient provides a TCP client for sending and receiving framed messages asynchronously.
-/// Handles connection, message sending, and background message listening.
+/// Uses two separate connections: one for commands/responses and another for broadcast messages.
+/// This eliminates race conditions between command responses and broadcast messages.
 /// </summary>
 public class SocketsClient : IDisposable {
     // Constants
@@ -27,19 +25,20 @@ public class SocketsClient : IDisposable {
     // Timeout for reading messages in milliseconds
     private readonly int _readTimeoutMs;
 
-    // Underlying TCP socket
-    private readonly Socket _socket;
-    
-    // Server endpoint to connect to
-    private readonly IPEndPoint _endPoint;
-        
-    // Network stream for reading/writing data
-    private NetworkStream? _stream;
+    // Command socket and stream for sending commands and receiving responses
+    private readonly Socket _commandSocket;
+    private readonly IPEndPoint _commandEndPoint;
+    private NetworkStream? _commandStream;
+
+    // Broadcast socket and stream for receiving broadcast messages (port + 1)
+    private readonly Socket _broadcastSocket;
+    private readonly IPEndPoint _broadcastEndPoint;
+    private NetworkStream? _broadcastStream;
     
     // Poll delay in milliseconds to avoid busy waiting
     private readonly int _pollDelayMs;
     
-    // Semaphore for synchronizing send operations (only for send, not broadcast)
+    // Semaphore for synchronizing send operations
     private readonly SemaphoreSlim _sendSemaphore = new(1, 1);
 
     // CommsHost object for host and port information
@@ -79,12 +78,14 @@ public class SocketsClient : IDisposable {
     /// Constructor with custom host, port, and poll delay.
     /// </summary>
     /// <param name="host">IP address of the host to connect to</param>
-    /// <param name="port">Port number to use</param>
+    /// <param name="port">Port number to use for commands</param>
     /// <param name="pollDelayMs">Delay in milliseconds between polls when no data is available</param>
     public SocketsClient(IPAddress host, int port, int pollDelayMs = DEFAULT_POLL_DELAY_MS, int readTimeoutMs = DEFAULT_READ_TIMEOUT_MS) {
         _commsHost = new CommsHost(host.ToString(), port);
-        _endPoint = new IPEndPoint(host, port);
-        _socket = new Socket(_endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+        _commandEndPoint = new IPEndPoint(host, port);
+        _broadcastEndPoint = new IPEndPoint(host, port + 1);
+        _commandSocket = new Socket(_commandEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+        _broadcastSocket = new Socket(_broadcastEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
         _pollDelayMs = pollDelayMs > 0 ? pollDelayMs : DEFAULT_POLL_DELAY_MS;
         _readTimeoutMs = readTimeoutMs > 0 ? readTimeoutMs : DEFAULT_READ_TIMEOUT_MS;
     }
@@ -95,9 +96,9 @@ public class SocketsClient : IDisposable {
     public CommsHost CommsHost => _commsHost ?? throw new InvalidOperationException("CommsHost is not initialized. Please ensure the client is properly constructed.");
 
     /// <summary>
-    /// Gets the current state of the socket connection.
+    /// Gets the current state of the socket connections.
     /// </summary>
-    public bool IsConnected => _socket.Connected;
+    public bool IsConnected => _commandSocket.Connected && _broadcastSocket.Connected;
 
     /// <summary>
     /// Connects to a server and starts background message listening (synchronous version).
@@ -107,14 +108,21 @@ public class SocketsClient : IDisposable {
         OnMessageReceived = onMessageReceived;
 
         try {
-            // Connect to the server endpoint
-            _socket.Connect(_endPoint);
-            if (_socket.Connected == false) {
-                throw new Exception("Cannot connect to the server.");
+            // Connect to the command server endpoint
+            _commandSocket.Connect(_commandEndPoint);
+            if (_commandSocket.Connected == false) {
+                throw new Exception("Cannot connect to the command server.");
             }
 
-            // Create the network stream for communication
-            _stream = new NetworkStream(_socket);
+            // Connect to the broadcast server endpoint (port + 1)
+            _broadcastSocket.Connect(_broadcastEndPoint);
+            if (_broadcastSocket.Connected == false) {
+                throw new Exception("Cannot connect to the broadcast server.");
+            }
+
+            // Create the network streams for communication
+            _commandStream = new NetworkStream(_commandSocket);
+            _broadcastStream = new NetworkStream(_broadcastSocket);
 
             // Start the async broadcast message listener in a separate thread
             _broadcastTask = Task.Run(async () => await WaitBroadcastMessageAsync());
@@ -137,14 +145,21 @@ public class SocketsClient : IDisposable {
         OnMessageReceived = onMessageReceived;
 
         try {
-            // Connect to the server endpoint
-            await _socket.ConnectAsync(_endPoint);
-            if (_socket.Connected == false) {
-                throw new Exception("Cannot connect to the server.");
+            // Connect to the command server endpoint
+            await _commandSocket.ConnectAsync(_commandEndPoint);
+            if (_commandSocket.Connected == false) {
+                throw new Exception("Cannot connect to the command server.");
             }
 
-            // Create the network stream for communication
-            _stream = new NetworkStream(_socket);
+            // Connect to the broadcast server endpoint (port + 1)
+            await _broadcastSocket.ConnectAsync(_broadcastEndPoint);
+            if (_broadcastSocket.Connected == false) {
+                throw new Exception("Cannot connect to the broadcast server.");
+            }
+
+            // Create the network streams for communication
+            _commandStream = new NetworkStream(_commandSocket);
+            _broadcastStream = new NetworkStream(_broadcastSocket);
 
             // Start the async broadcast message listener in a separate thread
             _broadcastTask = Task.Run(async () => await WaitBroadcastMessageAsync());
@@ -163,8 +178,8 @@ public class SocketsClient : IDisposable {
     /// <param name="message">Framed message to send</param>
     /// <returns>Response message bytes</returns>
     public byte[] Send(byte[] message) {
-        if (_socket?.Connected == false) {
-            throw new InvalidOperationException("Socket not connected");
+        if (_commandSocket?.Connected == false) {
+            throw new InvalidOperationException("Command socket not connected");
         }
 
         if (message.Length == 0) {
@@ -181,8 +196,8 @@ public class SocketsClient : IDisposable {
             _sendSemaphore.Wait();
             bool hasResponse = false;
 
-            // Send the message
-            _stream!.Write(message);
+            // Send the message on the command stream
+            _commandStream!.Write(message);
 
             // Get a buffer from the ArrayPool
             byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(MAX_BUFFER_SIZE);
@@ -193,7 +208,7 @@ public class SocketsClient : IDisposable {
                 _responseBuffer.Clear();
 
                 while (!hasResponse) {
-                    var bytesRead = _stream.Read(buffer, 0, buffer.Length);
+                    var bytesRead = _commandStream.Read(buffer, 0, buffer.Length);
                     if (bytesRead == 0) {
                         continue;
                     }
@@ -248,8 +263,8 @@ public class SocketsClient : IDisposable {
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Response message bytes</returns>
     public async Task<byte[]> SendAsync(byte[] message, CancellationToken cancellationToken = default) {
-        if (_socket?.Connected == false) {
-            throw new InvalidOperationException("Socket not connected");
+        if (_commandSocket?.Connected == false) {
+            throw new InvalidOperationException("Command socket not connected");
         }        if (message.Length == 0) {
             throw new InvalidOperationException("Message is empty");
         }
@@ -265,8 +280,8 @@ public class SocketsClient : IDisposable {
             // Acquire send semaphore
             await _sendSemaphore.WaitAsync(combinedToken);
 
-            // Send the message
-            await _stream!.WriteAsync(message, combinedToken);
+            // Send the message on the command stream
+            await _commandStream!.WriteAsync(message, combinedToken);
 
             // Get a buffer from the ArrayPool
             byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(MAX_BUFFER_SIZE);
@@ -278,7 +293,7 @@ public class SocketsClient : IDisposable {
                 bool foundSTX = false;
                 _responseBuffer.Clear();
                 while (!hasResponse && !combinedToken.IsCancellationRequested) {
-                    var bytesRead = await _stream.ReadAsync(buffer, combinedToken);
+                    var bytesRead = await _commandStream.ReadAsync(buffer, combinedToken);
                     if (bytesRead == 0) {
                         continue;
                     }
@@ -349,16 +364,16 @@ public class SocketsClient : IDisposable {
             int posBuffer = 0;
             bool receivingMessage = false;
 
-            while (_socket.Connected && !cancellationToken.IsCancellationRequested) {
-                // Process broadcast messages independently of send operations
-                if (_stream!.DataAvailable) {
+            while (_broadcastSocket.Connected && !cancellationToken.IsCancellationRequested) {
+                // Process broadcast messages on the dedicated broadcast stream
+                if (_broadcastStream!.DataAvailable) {
                     // Create a linked cancellation token with timeout
                     using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                     timeoutCts.CancelAfter(_readTimeoutMs);
                     
                     int bytesRead;
                     try {
-                        bytesRead = await _stream.ReadAsync(buffer, timeoutCts.Token);
+                        bytesRead = await _broadcastStream.ReadAsync(buffer, timeoutCts.Token);
                         if (bytesRead <= 0 || cancellationToken.IsCancellationRequested) {
                             continue;
                         }
@@ -433,10 +448,15 @@ public class SocketsClient : IDisposable {
                 }
             }
 
-            // Disconnect and close the socket if connected
-            if (_socket is not null && _socket.Connected) {
-                _socket?.Disconnect(false);
-                _socket?.Close();
+            // Disconnect and close both sockets if connected
+            if (_commandSocket is not null && _commandSocket.Connected) {
+                _commandSocket?.Disconnect(false);
+                _commandSocket?.Close();
+            }
+
+            if (_broadcastSocket is not null && _broadcastSocket.Connected) {
+                _broadcastSocket?.Disconnect(false);
+                _broadcastSocket?.Close();
             }
             
             // Clear event handlers to prevent memory leaks
@@ -469,10 +489,15 @@ public class SocketsClient : IDisposable {
                 }
             }
 
-            // Disconnect and close the socket if connected
-            if (_socket is not null && _socket.Connected) {
-                _socket.Disconnect(false);
-                _socket?.Close();
+            // Disconnect and close both sockets if connected
+            if (_commandSocket is not null && _commandSocket.Connected) {
+                _commandSocket.Disconnect(false);
+                _commandSocket?.Close();
+            }
+
+            if (_broadcastSocket is not null && _broadcastSocket.Connected) {
+                _broadcastSocket.Disconnect(false);
+                _broadcastSocket?.Close();
             }
             
             // Clear event handlers to prevent memory leaks
@@ -497,8 +522,10 @@ public class SocketsClient : IDisposable {
         _broadcastMsgBuffer?.Clear();
         _responseBuffer?.Clear();
         // Don't dispose the task - just let it be collected by GC
-        _stream?.Dispose();
-        _socket?.Dispose();
+        _commandStream?.Dispose();
+        _broadcastStream?.Dispose();
+        _commandSocket?.Dispose();
+        _broadcastSocket?.Dispose();
         GC.SuppressFinalize(this);
     }
 }

@@ -6,7 +6,8 @@ namespace McComms.Sockets;
 
 /// <summary>
 /// Provides socket server functionality for handling client connections, 
-/// message processing, and broadcasting.
+/// message processing, and broadcasting using two separate ports.
+/// Uses main port for commands and main port + 1 for broadcasts.
 /// </summary>
 public class SocketsServer : IDisposable {
     /// <summary>
@@ -18,19 +19,34 @@ public class SocketsServer : IDisposable {
     public const int DEFAULT_POLL_DELAY_MS = 5;
 
     /// <summary>
-    /// TCP listener socket for accepting incoming client connections.
+    /// TCP listener socket for accepting incoming command client connections.
     /// </summary>
-    private readonly Socket _tcpListener;
+    private readonly Socket _commandListener;
 
     /// <summary>
-    /// Endpoint for the TCP listener defining the IP address and port to listen on.
+    /// TCP listener socket for accepting incoming broadcast client connections (port + 1).
     /// </summary>
-    private readonly IPEndPoint? _tcpEndPoint = null;
+    private readonly Socket _broadcastListener;
 
     /// <summary>
-    /// Thread-safe collection of currently connected clients.
+    /// Endpoint for the command TCP listener defining the IP address and port to listen on.
     /// </summary>
-    private readonly ConcurrentBag<SocketsClientModel> _clients = [];
+    private readonly IPEndPoint? _commandEndPoint = null;
+
+    /// <summary>
+    /// Endpoint for the broadcast TCP listener (port + 1).
+    /// </summary>
+    private readonly IPEndPoint? _broadcastEndPoint = null;
+
+    /// <summary>
+    /// Thread-safe collection of currently connected command clients.
+    /// </summary>
+    private readonly ConcurrentBag<SocketsClientModel> _commandClients = [];
+
+    /// <summary>
+    /// Thread-safe collection of currently connected broadcast clients.
+    /// </summary>
+    private readonly ConcurrentBag<SocketsClientModel> _broadcastClients = [];
 
     /// <summary>
     /// Counter for assigning unique client IDs.
@@ -72,38 +88,68 @@ public class SocketsServer : IDisposable {
     /// Initializes a new instance of the SocketsServer class with the specified IP address, port, and poll delay.
     /// </summary>
     /// <param name="ipAddress">The IP address to listen on.</param>
-    /// <param name="port">The port number to use.</param>
+    /// <param name="port">The port number to use for commands (broadcast will use port + 1).</param>
     /// <param name="pollDelayMs">The delay in milliseconds between polls when no data is available.</param>
     public SocketsServer(IPAddress ipAddress, int port, int pollDelayMs) {
         _commsHost = new CommsHost(ipAddress.ToString(), port);
-        _tcpEndPoint = new IPEndPoint(ipAddress, port);
-        _tcpListener = new Socket(_tcpEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+        _commandEndPoint = new IPEndPoint(ipAddress, port);
+        _broadcastEndPoint = new IPEndPoint(ipAddress, port + 1);
+        _commandListener = new Socket(_commandEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+        _broadcastListener = new Socket(_broadcastEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
         _pollDelayMs = pollDelayMs > 0 ? pollDelayMs : DEFAULT_POLL_DELAY_MS;
     }
 
     public CommsHost CommsHost => _commsHost ?? throw new InvalidOperationException("CommsHost is not initialized.");
 
     /// <summary>
-    /// Removes a specific disconnected client from the collection immediately.
+    /// Removes a specific disconnected command client from the collection immediately.
     /// </summary>
     /// <param name="clientToRemove">The client to remove and dispose.</param>
-    private async Task RemoveClientAsync(SocketsClientModel clientToRemove) {
+    private async Task RemoveCommandClientAsync(SocketsClientModel clientToRemove) {
         await _messageProcessingLock.WaitAsync();
         try {
             // Create new collection without the disconnected client
-            var remainingClients = _clients.Where(c => c != clientToRemove && c.Connected).ToArray();
-            _clients.Clear();
+            var remainingClients = _commandClients.Where(c => c != clientToRemove && c.Connected).ToArray();
+            _commandClients.Clear();
             foreach (var client in remainingClients) {
-                _clients.Add(client);
+                _commandClients.Add(client);
             }
 
             // Dispose the removed client
             try {
                 clientToRemove.Dispose();
-                Debug.WriteLine($"Client {clientToRemove.Id} removed and disposed, remaining clients: {_clients.Count}");
+                Debug.WriteLine($"Command client {clientToRemove.Id} removed and disposed, remaining clients: {_commandClients.Count}");
             }
             catch (Exception ex) {
-                Debug.WriteLine($"Error disposing removed client {clientToRemove.Id}: {ex.Message}");
+                Debug.WriteLine($"Error disposing removed command client {clientToRemove.Id}: {ex.Message}");
+            }
+        }
+        finally {
+            _messageProcessingLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Removes a specific disconnected broadcast client from the collection immediately.
+    /// </summary>
+    /// <param name="clientToRemove">The client to remove and dispose.</param>
+    private async Task RemoveBroadcastClientAsync(SocketsClientModel clientToRemove) {
+        await _messageProcessingLock.WaitAsync();
+        try {
+            // Create new collection without the disconnected client
+            var remainingClients = _broadcastClients.Where(c => c != clientToRemove && c.Connected).ToArray();
+            _broadcastClients.Clear();
+            foreach (var client in remainingClients) {
+                _broadcastClients.Add(client);
+            }
+
+            // Dispose the removed client
+            try {
+                clientToRemove.Dispose();
+                Debug.WriteLine($"Broadcast client {clientToRemove.Id} removed and disposed, remaining clients: {_broadcastClients.Count}");
+            }
+            catch (Exception ex) {
+                Debug.WriteLine($"Error disposing removed broadcast client {clientToRemove.Id}: {ex.Message}");
             }
         }
         finally {
@@ -113,6 +159,7 @@ public class SocketsServer : IDisposable {
 
     /// <summary>
     /// Starts listening for incoming client connections and processes their messages asynchronously.
+    /// This now handles both command and broadcast connections on separate ports.
     /// </summary>
     /// <param name="onMessageReceived">Callback function invoked when a message is received from a client.</param>
     /// <param name="stopToken">A cancellation token that can be used to stop the server.</param>
@@ -120,31 +167,74 @@ public class SocketsServer : IDisposable {
     public async Task ListenAsync(Func<byte[], byte[]> onMessageReceived, CancellationToken stopToken) {
         _onMessageReceived = onMessageReceived;
 
-        _tcpListener.Bind(_tcpEndPoint!);
-        _tcpListener.Listen();
+        // Start listening on both ports
+        _commandListener.Bind(_commandEndPoint!);
+        _commandListener.Listen();
+        
+        _broadcastListener.Bind(_broadcastEndPoint!);
+        _broadcastListener.Listen();
 
-        // Main accept loop
-        while (stopToken.IsCancellationRequested == false) {
+        // Start command and broadcast listeners concurrently
+        var commandTask = Task.Run(async () => await AcceptCommandClientsAsync(stopToken), stopToken);
+        var broadcastTask = Task.Run(async () => await AcceptBroadcastClientsAsync(stopToken), stopToken);
+
+        // Wait for cancellation
+        try {
+            await Task.WhenAny(commandTask, broadcastTask);
+        }
+        catch (OperationCanceledException) {
+            // Expected when stopping the server
+        }
+    }
+
+    /// <summary>
+    /// Accepts incoming command client connections.
+    /// </summary>
+    private async Task AcceptCommandClientsAsync(CancellationToken stopToken) {
+        while (!stopToken.IsCancellationRequested) {
             try {
-                Socket client = await _tcpListener.AcceptAsync(stopToken);
+                Socket client = await _commandListener.AcceptAsync(stopToken);
                 var socketClient = new SocketsClientModel(client, new NetworkStream(client), DEFAULT_BUFFER_SIZE) {
-                    // Assign ID atomically and add to thread-safe collection
                     Id = Interlocked.Increment(ref _nextClientId)
                 };
-                _clients.Add(socketClient);
+                _commandClients.Add(socketClient);
 
-                Debug.WriteLine($"Client connected, total clients: {_clients.Count}");
+                Debug.WriteLine($"Command client connected, total command clients: {_commandClients.Count}");
 
                 // Handle client messages in a background task
-                _ = Task.Run(async () => await MessagesHandler(socketClient, stopToken), stopToken);
+                _ = Task.Run(async () => await CommandMessagesHandler(socketClient, stopToken), stopToken);
             }
             catch (OperationCanceledException) {
-                // Cancellation requested, break out of the loop
                 break;
             }
             catch (Exception ex) {
-                Debug.WriteLine($"McComms.Socket ERROR accepting client: {ex.Message}");
-                // Continue listening for next connection
+                Debug.WriteLine($"Error accepting command client: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Accepts incoming broadcast client connections.
+    /// </summary>
+    private async Task AcceptBroadcastClientsAsync(CancellationToken stopToken) {
+        while (!stopToken.IsCancellationRequested) {
+            try {
+                Socket client = await _broadcastListener.AcceptAsync(stopToken);
+                var socketClient = new SocketsClientModel(client, new NetworkStream(client), DEFAULT_BUFFER_SIZE) {
+                    Id = Interlocked.Increment(ref _nextClientId)
+                };
+                _broadcastClients.Add(socketClient);
+
+                Debug.WriteLine($"Broadcast client connected, total broadcast clients: {_broadcastClients.Count}");
+
+                // Broadcast clients only receive, no message handling needed
+                // They will be used only for sending broadcast messages
+            }
+            catch (OperationCanceledException) {
+                break;
+            }
+            catch (Exception ex) {
+                Debug.WriteLine($"Error accepting broadcast client: {ex.Message}");
             }
         }
     }
@@ -161,7 +251,7 @@ public class SocketsServer : IDisposable {
     }
 
     /// <summary>
-    /// Sends a broadcast message to all connected clients asynchronously.
+    /// Sends a broadcast message to all connected broadcast clients asynchronously.
     /// </summary>
     /// <param name="command">The message to broadcast as a byte array.</param>
     /// <returns>A Task representing the asynchronous operation.</returns>
@@ -171,7 +261,7 @@ public class SocketsServer : IDisposable {
             int disconnectedCount = 0;
             var clientsToRemove = new List<SocketsClientModel>();
 
-            foreach (var client in _clients) {
+            foreach (var client in _broadcastClients) {
                 try {
                     if (client.Connected) {
                         await client.Stream.WriteAsync(command);
@@ -195,18 +285,18 @@ public class SocketsServer : IDisposable {
                         client.Dispose();
                     }
                     catch (Exception ex) {
-                        Debug.WriteLine($"Error disposing client: {ex.Message}");
+                        Debug.WriteLine($"Error disposing broadcast client: {ex.Message}");
                     }
                 }
 
                 // Remove disconnected clients immediately
-                var connectedClients = _clients.Where(c => c.Connected).ToArray();
-                _clients.Clear();
+                var connectedClients = _broadcastClients.Where(c => c.Connected).ToArray();
+                _broadcastClients.Clear();
                 foreach (var client in connectedClients) {
-                    _clients.Add(client);
+                    _broadcastClients.Add(client);
                 }
 
-                Debug.WriteLine($"{clientsToRemove.Count} client(s) removed immediately, remaining clients: {_clients.Count}");
+                Debug.WriteLine($"{clientsToRemove.Count} broadcast client(s) removed immediately, remaining clients: {_broadcastClients.Count}");
             }
 
             if (disconnectedCount > 0) {
@@ -219,12 +309,12 @@ public class SocketsServer : IDisposable {
     }
 
     /// <summary>
-    /// Handles messages from a specific client, processing incoming data according to the protocol.
+    /// Handles command messages from a specific client, processing incoming data according to the protocol.
     /// </summary>
     /// <param name="client">The client model representing the connected client.</param>
     /// <param name="cancellationToken">A cancellation token that can be used to stop message handling.</param>
     /// <returns>A Task representing the asynchronous operation.</returns>    
-    private async Task MessagesHandler(SocketsClientModel client, CancellationToken cancellationToken) {
+    private async Task CommandMessagesHandler(SocketsClientModel client, CancellationToken cancellationToken) {
         Debug.Assert(client != null);
         // Get direct reference to message buffer
         var bufferMessage = client.MessageBuffer;
@@ -298,8 +388,8 @@ public class SocketsServer : IDisposable {
             ArrayPool<byte>.Shared.Return(buffer);
             
             // Immediately remove and dispose this client from the collection
-            _ = Task.Run(async () => await RemoveClientAsync(client));
-            Debug.WriteLine($"Client {client.Id} disconnected and scheduled for removal");
+            _ = Task.Run(async () => await RemoveCommandClientAsync(client));
+            Debug.WriteLine($"Command client {client.Id} disconnected and scheduled for removal");
         }
     }
 
@@ -317,29 +407,53 @@ public class SocketsServer : IDisposable {
     /// <param name="disposing">true to release both managed and unmanaged resources; false to release only unmanaged resources.</param>
     protected virtual void Dispose(bool disposing) {
         if (disposing) {
-            // Close the TCP listener socket
-            if (_tcpListener != null) {
+            // Close both TCP listener sockets
+            if (_commandListener != null) {
                 try {
-                    _tcpListener.Close();
+                    _commandListener.Close();
                 }
                 catch (Exception ex) {
-                    Debug.WriteLine($"Error during socket close: {ex.Message}");
+                    Debug.WriteLine($"Error during command listener close: {ex.Message}");
                 }
             }
 
-            // Close all client connections
-            foreach (var client in _clients) {
+            if (_broadcastListener != null) {
+                try {
+                    _broadcastListener.Close();
+                }
+                catch (Exception ex) {
+                    Debug.WriteLine($"Error during broadcast listener close: {ex.Message}");
+                }
+            }
+
+            // Close all command client connections
+            foreach (var client in _commandClients) {
                 try {
                     if (client.Connected) {
                         client.Dispose();
                     }
                 }
                 catch (Exception ex) {
-                    Debug.WriteLine($"Error disposing client connection: {ex.Message}");
+                    Debug.WriteLine($"Error disposing command client connection: {ex.Message}");
                 }
             }
 
-            _clients.Clear();
+            // Close all broadcast client connections
+            foreach (var client in _broadcastClients) {
+                try {
+                    if (client.Connected) {
+                        client.Dispose();
+                    }
+                }
+                catch (Exception ex) {
+                    Debug.WriteLine($"Error disposing broadcast client connection: {ex.Message}");
+                }
+            }
+
+            _commandClients.Clear();
+            _broadcastClients.Clear();
+            
+            _messageProcessingLock?.Dispose();
         }
     }
 }
