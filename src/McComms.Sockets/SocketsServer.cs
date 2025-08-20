@@ -12,10 +12,10 @@ public class SocketsServer : IDisposable {
     /// <summary>
     /// Constants
     /// </summary>
-    public const int DEFAULT_BUFFER_SIZE = 1500;
-    public const int DEFAULT_PORT = 8888;
-    public const int DEFAULT_POLL_DELAY_MS = 5;
     public const string DEFAULT_HOST = "127.0.0.1";
+    public const int DEFAULT_PORT = 50051;
+    public const int DEFAULT_BUFFER_SIZE = 1500;
+    public const int DEFAULT_POLL_DELAY_MS = 5;
 
     /// <summary>
     /// TCP listener socket for accepting incoming client connections.

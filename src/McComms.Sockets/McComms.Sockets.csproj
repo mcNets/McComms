@@ -22,7 +22,7 @@
 		<PackageId>McComms.Sockets</PackageId>		
 		<PackageIcon>mccomms-sockets.png</PackageIcon>
 
-		<Version>1.0.8</Version>
+		<Version>1.0.9</Version>
 	</PropertyGroup>
 
 	<ItemGroup>

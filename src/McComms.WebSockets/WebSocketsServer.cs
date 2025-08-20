@@ -17,7 +17,7 @@ public class WebSocketsServer : IDisposable {
     /// <summary>
     /// Initializes a new instance of WebSocketsServer with default host and port.
     /// </summary>
-    public WebSocketsServer() : this(IPAddress.Loopback, 8080) { }
+    public WebSocketsServer() : this(IPAddress.Loopback, 50051) { }
 
     /// <summary>
     /// Initializes a new instance of WebSocketsServer with specified IP address and port.

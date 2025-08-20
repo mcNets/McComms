@@ -13,7 +13,7 @@ public class SocketsClient : IDisposable {
     // Constants
     public const string DEFAULT_HOST = "127.0.0.1";
 
-    public const int DEFAULT_PORT = 8888;
+    public const int DEFAULT_PORT = 50051;
 
     // Maximum buffer size for reading messages
     private const int MAX_BUFFER_SIZE = 1500;
