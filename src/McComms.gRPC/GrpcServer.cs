@@ -6,91 +6,107 @@ using System.Diagnostics;
 /// gRPC server that implements the service defined in the proto file.
 /// This class manages client connections and message distribution.
 /// </summary>
-public class GrpcServer : mcServeis.mcServeisBase {
-    // Default host and port for the server
+public sealed class GrpcServer : mcServeis.mcServeisBase {
     public const string DEFAULT_HOST = "localhost";
     public const int DEFAULT_PORT = 50051;
 
-    private readonly List<IServerStreamWriter<mcBroadcast>> _broadcastWriters;
     private readonly Server? _server;
-    private readonly CommsHost? _commsHost;
-    private bool _isRunning = false;
+    private readonly CommsHost _commsHost = new(DEFAULT_HOST, DEFAULT_PORT);
+    private readonly List<IServerStreamWriter<mcBroadcast>> _broadcastWriters = [];
+    private readonly Lock _broadcastWritersLock = new();
 
     private Func<mcCommandRequest, mcCommandResponse>? OnCommandReceived { get; set; }
+
+    /// <summary>
+    /// Gets the underlying gRPC server instance
+    /// </summary>
+    public Server? Server => _server ?? throw new InvalidOperationException("Server is not initialized.");
+
+    /// <summary>
+    /// Indicates whether the server is currently running
+    /// </summary>
+    public bool IsRunning { get; private set; } = false;
+
+    /// <summary>
+    /// Gets the CommsHost object that contains the host and port information
+    /// </summary>
+    public CommsHost Address => _commsHost;
 
     /// <summary>
     /// Default constructor that initializes the server on the default host and port
     /// </summary>
     public GrpcServer(ServerCredentials credentials, IEnumerable<ChannelOption>? channelOptions = null) {
-        _broadcastWriters = [];
-        _commsHost = new CommsHost(DEFAULT_HOST, DEFAULT_PORT);
         _server = new Server(channelOptions) {
             Services = { mcServeis.BindService(this) },
-            Ports = { new ServerPort(CommsHost.Host, CommsHost.Port, credentials) }
+            Ports = { new ServerPort(Address.Host, Address.Port, credentials) }
         };
     }
 
     /// <summary>
     /// Constructor that allows specifying host and port for the server
     /// </summary>
-    /// <param name="host">Address where the server will listen</param>
-    /// <param name="port">Port where the server will listen</param>
-    public GrpcServer(string host, int port, ServerCredentials credentials, IEnumerable<ChannelOption>? channelOptions = null) {
-        _broadcastWriters = [];
-        _commsHost = new CommsHost(host, port);
+    /// <param name="commsHost">The CommsHost object containing the host and port information</param>
+    public GrpcServer(CommsHost commsHost, ServerCredentials credentials, IEnumerable<ChannelOption>? channelOptions = null) {
+        _commsHost = commsHost;
         _server = new Server(channelOptions) {
             Services = { mcServeis.BindService(this) },
-            Ports = { new ServerPort(CommsHost.Host, CommsHost.Port, credentials) }
+            Ports = { new ServerPort(Address.Host, Address.Port, credentials) }
         };
     }
-
-    public Server? Server => _server;
-
-    public CommsHost CommsHost => _commsHost ?? throw new InvalidOperationException("CommsHost is not initialized.");
 
     /// <summary>
     /// Starts the gRPC server and configures the callback for received commands
     /// </summary>
     /// <param name="onCommandReceived">Function that will process received commands</param>
     /// <exception cref="ArgumentNullException">Thrown if the server is not initialized</exception>
-    public void Start(Func<mcCommandRequest, mcCommandResponse> onCommandReceived) {
-        ArgumentNullException.ThrowIfNull(_server);
-
-        // Check if the server is already running
-        if (_isRunning) {
-            Debug.WriteLine("Server is already running.");
-            return;
+    public bool Start(Func<mcCommandRequest, mcCommandResponse> onCommandReceived) {
+        if (_server == null) {
+            throw new InvalidOperationException("gRPC server is not initialized.");
         }
 
-        this.OnCommandReceived = onCommandReceived;
-        _server.Start();
-        _isRunning = true;
+        if (IsRunning) {
+            Debug.WriteLine("Server is already running.");
+            return true;
+        }
+
+        OnCommandReceived = onCommandReceived;
+
+        try {
+            _server.Start();
+        }
+        catch (Exception ex) {
+            Debug.WriteLine($"Error starting server: {ex.Message}");
+            return false;
+        }
+
+        IsRunning = true;
+        return true;
     }
 
     /// <summary>
-    /// Stops the gRPC server synchronously
+    /// Stops the gRPC server.
     /// </summary>
     public void Stop() {
         _ = StopAsync().ConfigureAwait(false);
     }
 
     /// <summary>
-    /// Stops the gRPC server and releases all resources
+    /// Stops the gRPC server.
     /// </summary>
     public async Task StopAsync() {
-        if (_server != null && _isRunning) {
+        if (_server != null && IsRunning) {
             try {
                 await _server.ShutdownAsync().ConfigureAwait(false);
             }
             catch (Exception ex) {
                 Debug.WriteLine($"Error shutting down server: {ex.Message}");
             }
-            finally {
-                _isRunning = false;
-            }
         }
 
-        _broadcastWriters.Clear();
+        IsRunning = false;
+        using (_broadcastWritersLock.EnterScope()) {
+            _broadcastWriters.Clear();
+        }
     }
 
     /// <summary>
@@ -101,16 +117,30 @@ public class GrpcServer : mcServeis.mcServeisBase {
     /// <returns>A response to the command</returns>
     /// <exception cref="ArgumentNullException">Thrown if the callback to process commands is not configured</exception>
     public override Task<mcCommandResponse> SendCommand(mcCommandRequest request, ServerCallContext context) {
-        ArgumentNullException.ThrowIfNull(OnCommandReceived);
-        var response = OnCommandReceived.Invoke(new mcCommandRequest { Id = request.Id, Content = request.Content });
-        return Task.FromResult(new mcCommandResponse { Success = response.Success, Id = response.Id, Message = response.Message });
+        if (OnCommandReceived == null) {
+            throw new InvalidOperationException("Command handler is not configured.");
+        }
+
+        try {
+            var response = OnCommandReceived.Invoke(new mcCommandRequest { Id = request.Id, Content = request.Content });
+            return Task.FromResult(new mcCommandResponse { Success = response.Success, Id = response.Id, Message = response.Message });
+        }
+        catch (Exception ex) {
+            Debug.WriteLine($"Error processing command {request.Id}: {ex.Message}");
+            return Task.FromResult(new mcCommandResponse { 
+                Success = false, 
+                Id = request.Id.ToString(), 
+                Message = $"Error processing command: {ex.Message}" 
+            });
+        }
     }
 
+    /// <summary>
     /// Sends a broadcast message to all connected clients
     /// </summary>
     /// <param name="message">The message to send to all clients</param>
     public void SendBroadcast(mcBroadcast message) {
-        if (_server == null || !_isRunning) {
+        if (_server == null || !IsRunning) {
             Debug.WriteLine("Server is not running. Cannot send broadcast.");
             throw new InvalidOperationException("Server is not running. Cannot send broadcast.");
         }
@@ -127,12 +157,17 @@ public class GrpcServer : mcServeis.mcServeisBase {
     /// <returns></returns>
     /// <exception cref="InvalidOperationException"></exception>
     public async Task SendBroadcastAsync(mcBroadcast message, CancellationToken cancellationToken = default) {
-        if (_server == null || !_isRunning) {
+        if (_server == null || !IsRunning) {
             Debug.WriteLine("Server is not running. Cannot send broadcast.");
             throw new InvalidOperationException("Server is not running. Cannot send broadcast.");
         }
 
-        foreach (var writer in _broadcastWriters) {
+        IServerStreamWriter<mcBroadcast>[] writers;
+        using (_broadcastWritersLock.EnterScope()) {
+            writers = [.. _broadcastWriters];
+        }
+
+        foreach (var writer in writers) {
             try {
                 await writer.WriteAsync(message, cancellationToken);
             }
@@ -152,7 +187,7 @@ public class GrpcServer : mcServeis.mcServeisBase {
     /// <param name="context">The gRPC call context</param>
     public override async Task Broadcast(IAsyncStreamReader<Empty> requestStream, IServerStreamWriter<mcBroadcast> responseStream, ServerCallContext context) {
         // Adds the client to the list of broadcast receivers
-        lock (_broadcastWriters) {
+        using (_broadcastWritersLock.EnterScope()) {
             _broadcastWriters.Add(responseStream);
             Debug.WriteLine("Client connected.");
         }
@@ -168,7 +203,7 @@ public class GrpcServer : mcServeis.mcServeisBase {
         }
         finally {
             // Cleans up resources when the client disconnects
-            lock (_broadcastWriters) {
+            using (_broadcastWritersLock.EnterScope()) {
                 _broadcastWriters.Remove(responseStream);
                 Debug.WriteLine("Client disconnected.");
             }

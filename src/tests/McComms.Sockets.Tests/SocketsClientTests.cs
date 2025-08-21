@@ -13,8 +13,8 @@ public class SocketsClientTests
         Assert.Multiple(() =>
         {
             Assert.That(client, Is.Not.Null);
-            Assert.That(client.CommsHost.Host, Is.EqualTo(SocketsClient.DEFAULT_HOST));
-            Assert.That(client.CommsHost.Port, Is.EqualTo(SocketsClient.DEFAULT_PORT));
+            Assert.That(client.Address.Host, Is.EqualTo(SocketsClient.DEFAULT_HOST));
+            Assert.That(client.Address.Port, Is.EqualTo(SocketsClient.DEFAULT_PORT));
         });
     }
 
@@ -29,8 +29,8 @@ public class SocketsClientTests
         Assert.Multiple(() =>
         {
             Assert.That(client, Is.Not.Null);
-            Assert.That(client.CommsHost.Host, Is.EqualTo(host));
-            Assert.That(client.CommsHost.Port, Is.EqualTo(port));
+            Assert.That(client.Address.Host, Is.EqualTo(host));
+            Assert.That(client.Address.Port, Is.EqualTo(port));
         });
     }
 

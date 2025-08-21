@@ -3,7 +3,17 @@
 /// <summary>
 /// Interface for a communications server. Handles starting, stopping, broadcasting, and command reception.
 /// </summary>
-public interface  ICommsServer {
+public interface ICommsServer {
+    /// <summary>
+    /// Gets the host information for the communications server.
+    /// </summary>
+    CommsAddress Address { get; }
+
+    /// <summary>
+    /// Gets or sets the callback for when a command is received from a client.
+    /// </summary>
+    Func<CommandRequest, CommandResponse>? CommandReceived { get; set; }
+
     /// <summary>
     /// Starts the server and sets the callback for received commands.
     /// </summary>
@@ -17,13 +27,19 @@ public interface  ICommsServer {
     void Stop();
 
     /// <summary>
+    /// Asynchronously stops the server.
+    /// </summary>
+    Task StopAsync();
+
+    /// <summary>
     /// Sends a broadcast message to all connected clients.
     /// </summary>
     /// <param name="msg">The broadcast message to send.</param>
     void SendBroadcast(BroadcastMessage msg);
 
     /// <summary>
-    /// Gets or sets the callback for when a command is received from a client.
+    /// Sends a broadcast message to all connected clients asynchronously.
     /// </summary>
-    Func<CommandRequest, CommandResponse>? CommandReceived { get; set; }
+    /// <param name="msg">The broadcast message to send.</param>
+    Task SendBroadcastAsync(BroadcastMessage msg);
 }

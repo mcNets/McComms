@@ -9,22 +9,24 @@ public class CommsClientGrpc : ICommsClient
     private readonly GrpcClient _client;
 
     /// <summary>
+    /// Gets the NetworkAddress object that contains the host and port information
+    /// </summary>
+    public NetworkAddress Address => _client.Address;
+    
+    /// <summary>
     /// Default constructor that initializes the client with default settings
     /// </summary>
     public CommsClientGrpc() {
-        _client = new GrpcClient();       
+        _client = new GrpcClient();
     }
 
     /// <summary>
     /// Constructor that allows specifying host and port for the connection
     /// </summary>
-    /// <param name="host">gRPC server address</param>
-    /// <param name="port">gRPC server port</param>
-    public CommsClientGrpc(string host, int port) {
-        _client = new GrpcClient(host, port);
+    /// <param name="address">The NetworkAddress object containing the host and port information</param>
+    public CommsClientGrpc(NetworkAddress address) {
+        _client = new GrpcClient(address);
     }
-
-    public CommsHost CommsHost => _client.CommsHost;
 
     /// <summary>
     /// Callback that is invoked when a broadcast message is received
