@@ -14,7 +14,7 @@ public class CommsHostTests
         const int expectedPort = 5000;
 
         // Act
-        var commsHost = new CommsAddress(expectedHost, expectedPort);
+        var commsHost = new NetworkAddress(expectedHost, expectedPort);
 
         // Assert
         Assert.Multiple(() =>
@@ -28,8 +28,8 @@ public class CommsHostTests
     public void RecordEquality_SameValues_AreEqual()
     {
         // Arrange
-        var host1 = new CommsAddress("localhost", 5000);
-        var host2 = new CommsAddress("localhost", 5000);
+        var host1 = new NetworkAddress("localhost", 5000);
+        var host2 = new NetworkAddress("localhost", 5000);
 
         // Act & Assert
         Assert.That(host1, Is.EqualTo(host2));
@@ -39,9 +39,9 @@ public class CommsHostTests
     public void RecordEquality_DifferentValues_AreNotEqual()
     {
         // Arrange
-        var host1 = new CommsAddress("localhost", 5000);
-        var host2 = new CommsAddress("127.0.0.1", 5000);
-        var host3 = new CommsAddress("localhost", 6000);
+        var host1 = new NetworkAddress("localhost", 5000);
+        var host2 = new NetworkAddress("127.0.0.1", 5000);
+        var host3 = new NetworkAddress("localhost", 6000);
 
         // Act & Assert
         Assert.Multiple(() =>
@@ -56,7 +56,7 @@ public class CommsHostTests
     public void WithMethods_UpdatePropertiesCorrectly()
     {
         // Arrange
-        var originalHost = new CommsAddress("localhost", 5000);
+        var originalHost = new NetworkAddress("localhost", 5000);
         
         // Act
         var updatedHost = originalHost with { Host = "127.0.0.1" };

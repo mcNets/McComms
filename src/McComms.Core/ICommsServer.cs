@@ -7,7 +7,7 @@ public interface ICommsServer {
     /// <summary>
     /// Gets the host information for the communications server.
     /// </summary>
-    CommsAddress Address { get; }
+    NetworkAddress Address { get; }
 
     /// <summary>
     /// Gets or sets the callback for when a command is received from a client.
