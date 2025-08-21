@@ -26,7 +26,7 @@ public class CommsServerSockets : ICommsServer {
     /// <summary>
     /// Gets the underlying gRPC server instance
     /// summary>
-    public CommsHost CommsHost => _socketServer.CommsHost;
+    public NetworkAddress Address => _socketServer.Address;
 
     /// <summary>
     /// Callback function that is invoked when a command is received.

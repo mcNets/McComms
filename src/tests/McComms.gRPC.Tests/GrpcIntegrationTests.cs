@@ -1,7 +1,9 @@
 using Commsproto;
 using Grpc.Core;
+using McComms.Core;
 using NUnit.Framework;
 using System.Collections.Concurrent;
+using System.Runtime.InteropServices;
 
 namespace McComms.gRPC.Tests;
 
@@ -21,7 +23,8 @@ public class GrpcIntegrationTests {
 
     [OneTimeSetUp]
     public async Task OneTimeSetup() {
-        _server = new GrpcServer(_host, _basePort, _serverCredentials);
+        var commsHost = new CommsAddress(_host, _basePort);
+        _server = new GrpcServer(commsHost: commsHost, credentials: _serverCredentials);
         _server.Start(onCommandReceived: (request) => {
             if (request.Id == 100) {
                 // Simulate a broadcast message
@@ -48,7 +51,8 @@ public class GrpcIntegrationTests {
     [Order(1)]
     public void ClientServer_SingleClient_SendCommandReceivesResponse() {
         // Create and connect client
-        var client = new GrpcClient(_host, _basePort);
+        var commsHost = new CommsAddress(_host, _basePort);
+        var client = new GrpcClient(commsHost);
         var connected = client.Connect(onBroadcastReceived: (msg) => {
             // Handle broadcast messages if needed
         });
@@ -74,7 +78,8 @@ public class GrpcIntegrationTests {
     [Order(2)]
     public async Task ClientServer_SingleClient_SendCommandAsyncReceivesResponse() {
         // Create and connect client
-        var client = new GrpcClient(_host, _basePort);
+        var commsHost = new CommsAddress(_host, _basePort);
+        var client = new GrpcClient(commsHost);
         var connected = await client.ConnectAsync(onBroadcastReceived: (msg) => {
             // Handle broadcast messages if needed
         });
@@ -100,8 +105,9 @@ public class GrpcIntegrationTests {
     [Order(3)]
     public void ClientServer_MultipleClients_AllReceiveResponses() {
         // Create and connect multiple clients
-        var client1 = new GrpcClient(_host, _basePort);
-        var client2 = new GrpcClient(_host, _basePort);
+        var commsHost = new CommsAddress(_host, _basePort);
+        var client1 = new GrpcClient(commsHost);
+        var client2 = new GrpcClient(commsHost);
 
         var connected1 = client1.Connect((_) => { });
         var connected2 = client2.Connect((_) => { });
@@ -135,8 +141,9 @@ public class GrpcIntegrationTests {
     [Order(4)]
     public async Task ClientServer_MultipleClientsAsync_AllReceiveResponses() {
         // Create and connect multiple clients
-        var client1 = new GrpcClient(_host, _basePort);
-        var client2 = new GrpcClient(_host, _basePort);
+        var commsHost = new CommsAddress(_host, _basePort);
+        var client1 = new GrpcClient(commsHost);
+        var client2 = new GrpcClient(commsHost);
 
         var connected1 = await client1.ConnectAsync((_) => { });
         var connected2 = await client2.ConnectAsync((_) => { });
@@ -174,8 +181,9 @@ public class GrpcIntegrationTests {
         var client2ReceivedMessages = new ConcurrentBag<mcBroadcast>();
 
         // Create and connect clients with broadcast handlers
-        var client1 = new GrpcClient(_host, _basePort);
-        var client2 = new GrpcClient(_host, _basePort);
+        var commsHost = new CommsAddress(_host, _basePort);
+        var client1 = new GrpcClient(commsHost);
+        var client2 = new GrpcClient(commsHost);
 
         var connected1 = client1.Connect(msg => client1ReceivedMessages.Add(msg));
         var connected2 = client2.Connect(msg => client2ReceivedMessages.Add(msg));
@@ -216,7 +224,8 @@ public class GrpcIntegrationTests {
     [Test]
     [Order(5)]
     public void ClientServer_Clients_ReceiveLongResponse() {
-        var client = new GrpcClient(_host, _basePort);
+        var commsHost = new CommsAddress(_host, _basePort);
+        var client = new GrpcClient(commsHost);
 
         var connected = client.Connect((_) => { });
 
@@ -239,7 +248,8 @@ public class GrpcIntegrationTests {
     [Order(6)]
     public void SendCommand_WithVeryShortTimeout_ReturnsErrorResponse() {
         // Arrange
-        var client = new GrpcClient(_host, _basePort);
+        var commsHost = new CommsAddress(_host, _basePort);
+        var client = new GrpcClient(commsHost);
         client.Timeout = 0; // Set extremely short timeout (0 seconds)
 
         var connected = client.Connect((_) => { });
@@ -263,7 +273,8 @@ public class GrpcIntegrationTests {
     [Order(7)]
     public async Task SendCommandAsync_WithVeryShortTimeout_ReturnsErrorResponse() {
         // Arrange
-        var client = new GrpcClient(_host, _basePort);
+        var commsHost = new CommsAddress(_host, _basePort);
+        var client = new GrpcClient(commsHost);
         client.Timeout = 0; // Set extremely short timeout (0 seconds)
 
         var connected = await client.ConnectAsync((_) => { });
@@ -287,7 +298,8 @@ public class GrpcIntegrationTests {
     [Order(8)]
     public async Task SendCommandAsync_WithCancellationToken_CancelsOperation() {
         // Arrange
-        var client = new GrpcClient(_host, _basePort);
+        var commsHost = new CommsAddress(_host, _basePort);
+        var client = new GrpcClient(commsHost);
         var connected = await client.ConnectAsync((_) => { });
         Assert.That(connected, Is.True, "Client failed to connect to server");
 
@@ -313,7 +325,8 @@ public class GrpcIntegrationTests {
     [Order(9)]
     public async Task SendCommandAsync_WithDelayedCancellation_CompletesBeforeCancellation() {
         // Arrange
-        var client = new GrpcClient(_host, _basePort);
+        var commsHost = new CommsAddress(_host, _basePort);
+        var client = new GrpcClient(commsHost);
         var connected = await client.ConnectAsync((_) => { });
         Assert.That(connected, Is.True, "Client failed to connect to server");
 
@@ -338,7 +351,8 @@ public class GrpcIntegrationTests {
     [Order(10)]
     public async Task ConnectAsync_WithCancellationToken_CancelsConnection() {
         // Arrange
-        var client = new GrpcClient(_host, _basePort);
+        var commsHost = new CommsAddress(_host, _basePort);
+        var client = new GrpcClient(commsHost);
 
         // Create a cancellation token that cancels immediately
         using var cts = new CancellationTokenSource();
@@ -355,7 +369,8 @@ public class GrpcIntegrationTests {
     [Order(11)]
     public void SendCommand_WithCustomTimeout_RespectsTimeoutSetting() {
         // Arrange
-        var client = new GrpcClient(_host, _basePort);
+        var commsHost = new CommsAddress(_host, _basePort);
+        var client = new GrpcClient(commsHost);
         client.Timeout = 1; // Set 1 second timeout
 
         var connected = client.Connect((_) => { });
@@ -379,7 +394,8 @@ public class GrpcIntegrationTests {
     [Order(12)]
     public async Task SendCommandAsync_StressTest_MultipleSimultaneousRequests() {
         // Arrange
-        var client = new GrpcClient(_host, _basePort);
+        var commsHost = new CommsAddress(_host, _basePort);
+        var client = new GrpcClient(commsHost);
         var connected = await client.ConnectAsync((_) => { });
         Assert.That(connected, Is.True, "Client failed to connect to server");
 
@@ -410,7 +426,8 @@ public class GrpcIntegrationTests {
     [Order(13)]
     public void Connect_ToNonExistentServer_ReturnsFalse() {
         var nonExistentPort = 65432;
-        var client = new GrpcClient(_host, nonExistentPort);
+        var commsHost = new CommsAddress(_host, nonExistentPort);
+        var client = new GrpcClient(commsHost);
 
         var connected = client.Connect((_) => { });
 
@@ -423,7 +440,8 @@ public class GrpcIntegrationTests {
     [Order(14)]
     public async Task ConnectAsync_ToNonExistentServer_ReturnsFalse() {
         var nonExistentPort = 65433;
-        var client = new GrpcClient(_host, nonExistentPort);
+        var commsHost = new CommsAddress(_host, nonExistentPort);
+        var client = new GrpcClient(commsHost);
 
         var connected = await client.ConnectAsync((_) => { });
         Assert.That(connected, Is.False, "Should not be able to connect to non-existent server");
@@ -437,7 +455,8 @@ public class GrpcIntegrationTests {
     public void Connect_ToInvalidHost_ReturnsFalse() {
         // Arrange - Use an invalid hostname
         var invalidHost = "invalid.hostname.that.does.not.exist";
-        var client = new GrpcClient(invalidHost, _basePort);
+        var commsHost = new CommsAddress(invalidHost, _basePort);
+        var client = new GrpcClient(commsHost);
 
         // Act
         var connected = client.Connect((_) => { });
@@ -454,7 +473,8 @@ public class GrpcIntegrationTests {
     public void SendCommand_ToNonExistentServer_ReturnsErrorResponse() {
         // Arrange - Create client connected to non-existent server
         var nonExistentPort = 65434;
-        var client = new GrpcClient(_host, nonExistentPort);
+        var commsHost = new CommsAddress(_host, nonExistentPort);
+        var client = new GrpcClient(commsHost);
 
         // Act - Try to send command without connecting (or to non-existent server)
         var request = new mcCommandRequest { Id = 1, Content = "TEST_COMMAND" };
@@ -475,7 +495,8 @@ public class GrpcIntegrationTests {
     public async Task SendCommandAsync_ToNonExistentServer_ReturnsErrorResponse() {
         // Arrange - Create client connected to non-existent server
         var nonExistentPort = 65435;
-        var client = new GrpcClient(_host, nonExistentPort);
+        var commsHost = new CommsAddress(_host, nonExistentPort);
+        var client = new GrpcClient(commsHost);
 
         // Act - Try to send command without connecting (or to non-existent server)
         var request = new mcCommandRequest { Id = 1, Content = "TEST_COMMAND" };
@@ -496,15 +517,16 @@ public class GrpcIntegrationTests {
     public async Task SendCommand_AfterServerShutdown_HandlesGracefully() {
         // Arrange - Create a temporary server on a different port
         var tempPort = _basePort + 100;
-        var tempServer = new GrpcServer(_host, tempPort, _serverCredentials);
+        var commsHost = new CommsAddress(_host, tempPort);
+        var tempServer = new GrpcServer(commsHost, _serverCredentials);
         tempServer.Start(onCommandReceived: (request) => {
             return new mcCommandResponse { Success = true, Message = request.Content };
         });
 
         // Give server time to start
         await Task.Delay(1000);
-
-        var client = new GrpcClient(_host, tempPort);
+    
+        var client = new GrpcClient(commsHost);
         var connected = client.Connect((_) => { });
         Assert.That(connected, Is.True, "Should connect to temporary server");
 
@@ -536,8 +558,9 @@ public class GrpcIntegrationTests {
     public async Task BroadcastListener_AfterServerShutdown_HandlesGracefully() {
         // Arrange - Create a temporary server on a different port
         var tempPort = _basePort + 101;
-        var tempServer = new GrpcServer(_host, tempPort, _serverCredentials);
-        
+        var commsHost = new CommsAddress(_host, tempPort);
+        var tempServer = new GrpcServer(commsHost, _serverCredentials);
+
         var broadcastReceived = false;
         var broadcastMessages = new ConcurrentBag<mcBroadcast>();
 
@@ -552,7 +575,7 @@ public class GrpcIntegrationTests {
         // Give server time to start
         await Task.Delay(1000);
 
-        var client = new GrpcClient(_host, tempPort);
+        var client = new GrpcClient(commsHost);
         var connected = await client.ConnectAsync(msg => {
             broadcastMessages.Add(msg);
             broadcastReceived = true;
@@ -586,14 +609,15 @@ public class GrpcIntegrationTests {
     public void Connect_WithInvalidPort_ReturnsFalse() {
         // Arrange - Use an invalid port number (negative or too high)
         var invalidPort = -1;
-        
+
         // Act & Assert - Should handle invalid port gracefully
-        Assert.DoesNotThrow(() => {
-            var client = new GrpcClient(_host, invalidPort);
+        Assert.DoesNotThrow((TestDelegate)(() => {
+            var commsHost = new CommsAddress(_host, invalidPort);
+            var client = new GrpcClient(commsHost);
             var connected = client.Connect((_) => { });
             Assert.That(connected, Is.False, "Should not connect with invalid port");
             client.Disconnect();
-        });
+        }));
     }
 
     [Test]
@@ -601,7 +625,8 @@ public class GrpcIntegrationTests {
     public async Task MultipleClients_ServerShutdown_AllHandleGracefully() {
         // Arrange - Create a temporary server
         var tempPort = _basePort + 102;
-        var tempServer = new GrpcServer(_host, tempPort, _serverCredentials);
+        var commsHost = new CommsAddress(_host, tempPort);
+        var tempServer = new GrpcServer(commsHost, _serverCredentials);
         tempServer.Start(onCommandReceived: (request) => {
             return new mcCommandResponse { Success = true, Message = request.Content };
         });
@@ -609,9 +634,9 @@ public class GrpcIntegrationTests {
         await Task.Delay(1000);
 
         // Connect multiple clients
-        var client1 = new GrpcClient(_host, tempPort);
-        var client2 = new GrpcClient(_host, tempPort);
-        var client3 = new GrpcClient(_host, tempPort);
+        var client1 = new GrpcClient(commsHost);
+        var client2 = new GrpcClient(commsHost);
+        var client3 = new GrpcClient(commsHost);
 
         var connected1 = await client1.ConnectAsync((_) => { });
         var connected2 = await client2.ConnectAsync((_) => { });
@@ -650,7 +675,8 @@ public class GrpcIntegrationTests {
     [Order(23)]
     public async Task SendCommandAsync_WithEmptyContent_HandlesGracefully() {
         // Arrange
-        var client = new GrpcClient(_host, _basePort);
+        var commsHost = new CommsAddress(_host, _basePort);
+        var client = new GrpcClient(commsHost);
         var connected = await client.ConnectAsync((_) => { });
         Assert.That(connected, Is.True, "Client failed to connect to server");
 
@@ -672,7 +698,8 @@ public class GrpcIntegrationTests {
     [Order(24)]
     public void SendCommand_WithExtremelyLongContent_HandlesGracefully() {
         // Arrange
-        var client = new GrpcClient(_host, _basePort);
+        var commsHost = new CommsAddress(_host, _basePort);
+        var client = new GrpcClient(commsHost);
         var connected = client.Connect((_) => { });
         Assert.That(connected, Is.True, "Client failed to connect to server");
 
@@ -701,7 +728,8 @@ public class GrpcIntegrationTests {
     [Order(25)]
     public async Task SendCommand_WithSpecialCharacters_HandlesGracefully() {
         // Arrange
-        var client = new GrpcClient(_host, _basePort);
+        var commsHost = new CommsAddress(_host, _basePort);
+        var client = new GrpcClient(commsHost);
         var connected = await client.ConnectAsync((_) => { });
         Assert.That(connected, Is.True, "Client failed to connect to server");
 
@@ -724,7 +752,8 @@ public class GrpcIntegrationTests {
     [Order(26)]
     public void SendCommand_WithNegativeId_HandlesGracefully() {
         // Arrange
-        var client = new GrpcClient(_host, _basePort);
+        var commsHost = new CommsAddress(_host, _basePort);
+        var client = new GrpcClient(commsHost);
         var connected = client.Connect((_) => { });
         Assert.That(connected, Is.True, "Client failed to connect to server");
 
@@ -746,7 +775,8 @@ public class GrpcIntegrationTests {
     [Order(27)]
     public async Task SendCommand_WithZeroId_HandlesGracefully() {
         // Arrange
-        var client = new GrpcClient(_host, _basePort);
+        var commsHost = new CommsAddress(_host, _basePort);
+        var client = new GrpcClient(commsHost);
         var connected = await client.ConnectAsync((_) => { });
         Assert.That(connected, Is.True, "Client failed to connect to server");
 
@@ -768,7 +798,8 @@ public class GrpcIntegrationTests {
     [Order(28)]
     public async Task SendCommand_ConcurrentStressTest_HandlesHighLoad() {
         // Arrange
-        var client = new GrpcClient(_host, _basePort);
+        var commsHost = new CommsAddress(_host, _basePort);
+        var client = new GrpcClient(commsHost);
         var connected = await client.ConnectAsync((_) => { });
         Assert.That(connected, Is.True, "Client failed to connect to server");
 
@@ -812,7 +843,8 @@ public class GrpcIntegrationTests {
     [Order(29)]
     public async Task SendCommand_RapidSequentialRequests_HandlesGracefully() {
         // Arrange
-        var client = new GrpcClient(_host, _basePort);
+        var commsHost = new CommsAddress(_host, _basePort);
+        var client = new GrpcClient(commsHost);
         var connected = await client.ConnectAsync((_) => { });
         Assert.That(connected, Is.True, "Client failed to connect to server");
 
@@ -848,7 +880,8 @@ public class GrpcIntegrationTests {
     [Order(30)]
     public void SendCommand_WithVeryLargeId_HandlesGracefully() {
         // Arrange
-        var client = new GrpcClient(_host, _basePort);
+        var commsHost = new CommsAddress(_host, _basePort);
+        var client = new GrpcClient(commsHost);
         var connected = client.Connect((_) => { });
         Assert.That(connected, Is.True, "Client failed to connect to server");
 
@@ -877,7 +910,8 @@ public class GrpcIntegrationTests {
 
         // Connect all clients
         for (int c = 0; c < numberOfClients; c++) {
-            var client = new GrpcClient(_host, _basePort);
+            var commsHost = new CommsAddress(_host, _basePort);
+            var client = new GrpcClient(commsHost);
             var connected = await client.ConnectAsync((_) => { });
             Assert.That(connected, Is.True, $"Client {c} should connect");
             clients.Add(client);
@@ -922,7 +956,8 @@ public class GrpcIntegrationTests {
     [Order(32)]
     public async Task SendCommand_WithUnicodeContent_HandlesGracefully() {
         // Arrange
-        var client = new GrpcClient(_host, _basePort);
+        var commsHost = new CommsAddress(_host, _basePort);
+        var client = new GrpcClient(commsHost);
         var connected = await client.ConnectAsync((_) => { });
         Assert.That(connected, Is.True, "Client failed to connect to server");
 
@@ -945,7 +980,8 @@ public class GrpcIntegrationTests {
     [Order(33)]
     public void SendCommand_WithBinaryLikeContent_HandlesGracefully() {
         // Arrange
-        var client = new GrpcClient(_host, _basePort);
+        var commsHost = new CommsAddress(_host, _basePort);
+        var client = new GrpcClient(commsHost);
         var connected = client.Connect((_) => { });
         Assert.That(connected, Is.True, "Client failed to connect to server");
 

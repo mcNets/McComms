@@ -1,3 +1,4 @@
+using McComms.Core;
 using NUnit.Framework;
 
 namespace McComms.gRPC.Tests;
@@ -14,8 +15,8 @@ public class GrpcClientTests
         Assert.Multiple(() =>
         {
             Assert.That(client, Is.Not.Null);
-            Assert.That(client.CommsHost.Host, Is.EqualTo(GrpcClient.DEFAULT_HOST));
-            Assert.That(client.CommsHost.Port, Is.EqualTo(GrpcClient.DEFAULT_PORT));
+            Assert.That(client.Host.Host, Is.EqualTo(GrpcClient.DEFAULT_HOST));
+            Assert.That(client.Host.Port, Is.EqualTo(GrpcClient.DEFAULT_PORT));
         });
     }
 
@@ -25,12 +26,13 @@ public class GrpcClientTests
     {
         var host = "custom.host";
         var port = 9000;
-        var client = new GrpcClient(host, port);
+        var commsHost = new CommsAddress(host, port);
+        var client = new GrpcClient(commsHost);
         Assert.Multiple(() =>
         {
             Assert.That(client, Is.Not.Null);
-            Assert.That(client.CommsHost.Host, Is.EqualTo(host));
-            Assert.That(client.CommsHost.Port, Is.EqualTo(port));
+            Assert.That(client.Host.Host, Is.EqualTo(host));
+            Assert.That(client.Host.Port, Is.EqualTo(port));
         });
     }
 

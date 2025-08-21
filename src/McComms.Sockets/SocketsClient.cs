@@ -42,7 +42,7 @@ public class SocketsClient : IDisposable {
     private readonly SemaphoreSlim _sendSemaphore = new(1, 1);
 
     // CommsHost object for host and port information
-    private readonly CommsHost? _commsHost;
+    private readonly NetworkAddress? _address;
 
     /// <summary>
     /// Callback invoked when a message is received from the server.
@@ -81,7 +81,7 @@ public class SocketsClient : IDisposable {
     /// <param name="port">Port number to use for commands</param>
     /// <param name="pollDelayMs">Delay in milliseconds between polls when no data is available</param>
     public SocketsClient(IPAddress host, int port, int pollDelayMs = DEFAULT_POLL_DELAY_MS, int readTimeoutMs = DEFAULT_READ_TIMEOUT_MS) {
-        _commsHost = new CommsHost(host.ToString(), port);
+        _address = new CommsHost(host.ToString(), port);
         _commandEndPoint = new IPEndPoint(host, port);
         _broadcastEndPoint = new IPEndPoint(host, port + 1);
         _commandSocket = new Socket(_commandEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
@@ -93,7 +93,7 @@ public class SocketsClient : IDisposable {
     /// <summary>
     /// Gets the CommsHost object that contains the host and port information
     /// </summary>
-    public CommsHost CommsHost => _commsHost ?? throw new InvalidOperationException("CommsHost is not initialized. Please ensure the client is properly constructed.");
+    public NetworkAddress Address => _address ?? throw new InvalidOperationException("CommsHost is not initialized. Please ensure the client is properly constructed.");
 
     /// <summary>
     /// Gets the current state of the socket connections.

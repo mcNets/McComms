@@ -64,7 +64,7 @@ public class SocketsServer : IDisposable {
     private readonly int _pollDelayMs;
 
     // The communication host that defines the address and port for the server
-    private readonly CommsHost? _commsHost;
+    private readonly NetworkAddress? _address;
 
     // Semaphore for message processing synchronization
     private readonly SemaphoreSlim _messageProcessingLock = new(1, 1);
@@ -91,7 +91,7 @@ public class SocketsServer : IDisposable {
     /// <param name="port">The port number to use for commands (broadcast will use port + 1).</param>
     /// <param name="pollDelayMs">The delay in milliseconds between polls when no data is available.</param>
     public SocketsServer(IPAddress ipAddress, int port, int pollDelayMs) {
-        _commsHost = new CommsHost(ipAddress.ToString(), port);
+        _address = new CommsHost(ipAddress.ToString(), port);
         _commandEndPoint = new IPEndPoint(ipAddress, port);
         _broadcastEndPoint = new IPEndPoint(ipAddress, port + 1);
         _commandListener = new Socket(_commandEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
@@ -99,7 +99,7 @@ public class SocketsServer : IDisposable {
         _pollDelayMs = pollDelayMs > 0 ? pollDelayMs : DEFAULT_POLL_DELAY_MS;
     }
 
-    public CommsHost CommsHost => _commsHost ?? throw new InvalidOperationException("CommsHost is not initialized.");
+    public NetworkAddress Address => _address ?? throw new InvalidOperationException("CommsHost is not initialized.");
 
     /// <summary>
     /// Removes a specific disconnected command client from the collection immediately.

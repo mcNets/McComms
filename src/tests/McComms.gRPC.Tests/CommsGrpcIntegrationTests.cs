@@ -1,4 +1,5 @@
 using Commsproto;
+using McComms.Core;
 using NUnit.Framework;
 using System.Collections.Concurrent;
 
@@ -20,7 +21,8 @@ public class CommsGrpcIntegrationTests
     public async Task OneTimeSetup()
     {
         CancellationTokenSource _serverCts = new();
-        _server = new CommsServerGrpc(Host, BasePort);
+        var commsHost = new CommsAddress(Host, BasePort);
+        _server = new CommsServerGrpc(commsHost);
         _server.Start(onCommandReceived: (request) =>
         {
             if (request.Id == 100)
@@ -49,7 +51,8 @@ public class CommsGrpcIntegrationTests
     [Order(1)]
     public void ClientServer_SingleClient_SendCommandReceivesResponse() {
         // Create and connect client
-        var client = new CommsClientGrpc(Host, BasePort);
+        var commsHost = new CommsAddress(Host, BasePort);
+        var client = new CommsClientGrpc(commsHost);
         var connected = client.Connect(onBroadcastReceived: (msg) => {
             // Handle broadcast messages if needed
         });
@@ -76,8 +79,9 @@ public class CommsGrpcIntegrationTests
     public async Task ClientServer_SingleClient_SendCommandAsyncReceivesResponse()
     {
         // Create and connect client
-        var client = new CommsClientGrpc(Host, BasePort);
-        var connected = await client.ConnectAsync(onBroadcastReceived: (msg) => { 
+        var commsHost = new CommsAddress(Host, BasePort);
+        var client = new CommsClientGrpc(commsHost);
+        var connected = await client.ConnectAsync(onBroadcastReceived: (msg) => {
             // Handle broadcast messages if needed
         });
 
@@ -104,8 +108,9 @@ public class CommsGrpcIntegrationTests
     public void ClientServer_MultipleClients_AllReceiveResponses()
     {
         // Create and connect multiple clients
-        var client1 = new CommsClientGrpc(Host, BasePort);
-        var client2 = new CommsClientGrpc(Host, BasePort);
+        var commsHost = new CommsAddress(Host, BasePort);
+        var client1 = new CommsClientGrpc(commsHost);
+        var client2 = new CommsClientGrpc(commsHost);
 
         var connected1 = client1.Connect((_) => { });
         var connected2 = client2.Connect((_) => { });
@@ -141,8 +146,9 @@ public class CommsGrpcIntegrationTests
     public async Task ClientServer_MultipleClientsAsync_AllReceiveResponses()
     {
         // Create and connect multiple clients
-        var client1 = new CommsClientGrpc(Host, BasePort);
-        var client2 = new CommsClientGrpc(Host, BasePort);
+        var commsHost = new CommsAddress(Host, BasePort);
+        var client1 = new CommsClientGrpc(commsHost);
+        var client2 = new CommsClientGrpc(commsHost);
 
         var connected1 = await client1.ConnectAsync((_) => { });
         var connected2 = await client2.ConnectAsync((_) => { });
@@ -182,8 +188,9 @@ public class CommsGrpcIntegrationTests
         var client2ReceivedMessages = new ConcurrentBag<Core.BroadcastMessage>();
 
         // Create and connect clients with broadcast handlers
-        var client1 = new CommsClientGrpc(Host, BasePort);
-        var client2 = new CommsClientGrpc(Host, BasePort);
+        var commsHost = new CommsAddress(Host, BasePort);
+        var client1 = new CommsClientGrpc(commsHost);
+        var client2 = new CommsClientGrpc(commsHost);
 
         var connected1 = client1.Connect(msg => client1ReceivedMessages.Add(msg));
         var connected2 = client2.Connect(msg => client2ReceivedMessages.Add(msg));
@@ -228,7 +235,8 @@ public class CommsGrpcIntegrationTests
     [Order(5)]
     public void ClientServer_Clients_ReceiveLongResponse()
     {
-        var client = new CommsClientGrpc(Host, BasePort);
+        var commsHost = new CommsAddress(Host, BasePort);
+        var client = new CommsClientGrpc(commsHost);
 
         var connected = client.Connect((_) => { });
 

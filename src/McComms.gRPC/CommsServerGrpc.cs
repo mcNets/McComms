@@ -14,7 +14,15 @@ public class CommsServerGrpc : ICommsServer
     /// </summary>
     public List<ChannelOption> ChannelOptions { get; } = [];
 
+    /// <summary>
+    /// Gets the Credentials information for the communications server.
+    /// </summary>
     public ServerCredentials Credentials { get; set; } = ServerCredentials.Insecure;
+
+    /// <summary>
+    /// Gets the CommsAddress object that contains the host and port information
+    /// </summary>
+    public NetworkAddress Address => _grpcServer.Address;
 
     /// <summary>
     /// Default constructor that initializes the server with default settings
@@ -28,14 +36,9 @@ public class CommsServerGrpc : ICommsServer
     /// </summary>
     /// <param name="host">Address where the server will listen</param>
     /// <param name="port">Port where the server will listen</param>
-    public CommsServerGrpc(string host, int port) {
-        _grpcServer = new GrpcServer(host: host, port: port, credentials: Credentials, channelOptions: ChannelOptions);
+    public CommsServerGrpc(CommsHost commsHost) {
+        _grpcServer = new GrpcServer(commsHost: commsHost, credentials: Credentials, channelOptions: ChannelOptions);
     }
-
-    /// <summary>
-    /// Gets the underlying gRPC server instance
-    /// </summary>
-    public CommsHost CommsHost => _grpcServer.CommsHost;
 
     /// <summary>
     /// Callback that is invoked when a command is received from a client
@@ -65,6 +68,14 @@ public class CommsServerGrpc : ICommsServer
     }
 
     /// <summary>
+    /// Asynchronously stops the server.
+    /// </summary>
+    /// <returns></returns>
+    public async Task StopAsync() {
+        await _grpcServer.StopAsync();
+    }
+
+    /// <summary>
     /// Sends a broadcast message to all connected clients
     /// </summary>
     /// <param name="msg">The message to send to all clients</param>
@@ -78,7 +89,6 @@ public class CommsServerGrpc : ICommsServer
     /// <param name="msg">The message to send to all clients</param>
     /// <param name="cancellationToken">Cancellation token to cancel the operation</param>
     /// <returns>A task representing the asynchronous operation</returns>
-    /// <exception cref="ArgumentNullException">Thrown if the gRPC server is not initialized</exception>
     public async Task SendBroadcastAsync(BroadcastMessage msg, CancellationToken cancellationToken = default) {
         await _grpcServer.SendBroadcastAsync(new mcBroadcast { Id = msg.Id, Content = msg.Message }, cancellationToken);
     }
@@ -90,7 +100,9 @@ public class CommsServerGrpc : ICommsServer
     /// <returns>The response in gRPC format</returns>
     /// <exception cref="ArgumentNullException">Thrown if CommandReceived is not initialized</exception>
     private mcCommandResponse OnCommandReceived(mcCommandRequest request) {
-        ArgumentNullException.ThrowIfNull(CommandReceived);
+        if (CommandReceived == null) {
+            throw new InvalidOperationException("Command handler is not configured.");
+        }
         var result = CommandReceived.Invoke(new CommandRequest(request.Id, request.Content));
         return new mcCommandResponse { Success = result.Success, Id = result.Id, Message = result.Message };
     }
