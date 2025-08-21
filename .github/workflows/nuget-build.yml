@@ -51,6 +51,8 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore McComms.sln
 
+      # temporarily removed the whole build.
+
       # - name: Build the solution
       #   run: dotnet build McComms.sln --no-restore --configuration Release
 
