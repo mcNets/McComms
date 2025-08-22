@@ -42,90 +42,6 @@ message mcBroadcast {
 message Empty {}
 
 ```
-
-### Command Flow
-
-```
-+--------+                        +--------+
-| Client |                        | Server |
-+--------+                        +--------+
-    |                                 |
-    | gRPC: SendCommand(mcCommandRequest)
-    |-------------------------------->|
-    |                                 | Process
-    |                                 | Command
-    |                                 |
-    | mcCommandResponse               |
-    |<--------------------------------|
-    |                                 |
-```
-
-### Broadcast Flow (Stream-Based)
-
-```
-+--------+                        +--------+
-| Client |                        | Server |
-+--------+                        +--------+
-    |                                 |
-    | SubscribeToBroadcast(Empty)     |
-    |-------------------------------->|
-    |                                 |
-    | Stream Established              |
-    |<--------------------------------|
-    |                                 |
-    | mcBroadcast Message 1           |
-    |<--------------------------------|
-    |                                 |
-    | mcBroadcast Message 2           |
-    |<--------------------------------|
-    |          ...                    |
-```
-
-## Example Usage
-
-### Server
-
-```csharp
-// Create a gRPC server on port 50051
-var server = new CommsServerGrpc("localhost", 50051);
-
-// Start the server with a command handler
-server.Start((request) => {
-    Console.WriteLine($"Received command: {request.Id} - {request.Message}");
-    return new CommandResponse(true, request.Id.ToString(), "Command processed");
-});
-
-// Send a broadcast message to all connected clients
-server.SendBroadcast(new BroadcastMessage(1, "System notification"));
-
-// Later, when application ends
-server.Stop();
-```
-
-### Client
-
-```csharp
-// Create a gRPC client
-var client = new CommsClientGrpc("localhost", 50051);
-
-// Connect and set up broadcast message handler
-var connected = await client.ConnectAsync((broadcast) => {
-    Console.WriteLine($"Received broadcast: {broadcast.Id} - {broadcast.Message}");
-});
-
-if (connected)
-{
-    // Send a command
-    var request = new CommandRequest(1, "Hello Server");
-    var response = await client.SendCommandAsync(request);
-    
-    Console.WriteLine($"Response: {response.Success} - {response.Message}");
-    
-    // When done
-    await client.DisconnectAsync();
-}
-```
-
 ## Benefits of gRPC
 
 - **High Performance**: Uses HTTP/2 for multiplexing and Protocol Buffers for efficient serialization
@@ -134,10 +50,9 @@ if (connected)
 - **Language Agnostic**: Clients and servers can be implemented in different languages
 - **Generated Code**: Reduces boilerplate and ensures type safety
 
-## Contents
-- gRPC services
-- Clients and servers
-- .proto files
+### Information and basic usage
+
+Have a look at the readme of [McComms project](https://github.com/mcnets/McComms) for more information and basic usage examples.
 
 ## Author
 Joan Magnet
