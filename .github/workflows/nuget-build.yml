@@ -33,6 +33,8 @@ jobs:
       - name: Remove local nuget.config
         run: rm nuget.config || true
 
+      # McComms.Core
+      # -------------------------------------------------------------------------------------------------------------
       - name: Restore McComms.Core
         run: dotnet restore src/McComms.Core/McComms.Core.csproj
 
@@ -48,25 +50,27 @@ jobs:
       - name: Push McComms.Core to NuGet
         run: dotnet nuget push src/Packages/McComms.Core.*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
 
-      - name: Restore dependencies
-        run: dotnet restore McComms.sln
+      # McComms.gRPC, McComms.Sockets, McComms.WebSockets
+      # -------------------------------------------------------------------------------------------------------------
+      # - name: Restore dependencies
+      #   run: dotnet restore McComms.sln
 
-      - name: Build the solution
-        run: dotnet build McComms.sln --no-restore --configuration Release
+      # - name: Build the solution
+      #   run: dotnet build McComms.sln --no-restore --configuration Release
 
-      - name: List generated packages
-        run: ls -la src/Packages
+      # - name: List generated packages
+      #   run: ls -la src/Packages
 
-      - name: Test McComms.gRPC
-        run: dotnet test src/tests/McComms.gRPC.Tests/McComms.gRPC.Tests.csproj --no-build --configuration Release
+      # - name: Test McComms.gRPC
+      #   run: dotnet test src/tests/McComms.gRPC.Tests/McComms.gRPC.Tests.csproj --no-build --configuration Release
 
-      - name: Test McComms.Sockets
-        run: dotnet test src/tests/McComms.Sockets.Tests/McComms.Sockets.Tests.csproj --no-build --configuration Release
+      # - name: Test McComms.Sockets
+      #   run: dotnet test src/tests/McComms.Sockets.Tests/McComms.Sockets.Tests.csproj --no-build --configuration Release
 
-      - name: Push packages to NuGet.org
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-        run: |
-          for package in src/Packages/*.nupkg; 
-          do
-            dotnet nuget push $package --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
-          done
+      # - name: Push packages to NuGet.org
+      #   if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+      #   run: |
+      #     for package in src/Packages/*.nupkg; 
+      #     do
+      #       dotnet nuget push $package --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+      #     done

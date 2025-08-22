@@ -40,15 +40,15 @@ public class CommandRequestTests
     public void TryParseCommandRequest_NullOrEmpty_ReturnsFalse()
     {
         string? str1 = null;
-        var result1 = str1.TryParseCommandResponse(out var response1);
+        var result1 = str1.TryParseCommandRequest(out var request1);
         var str2 = "";
-        var result2 = str2.TryParseCommandResponse(out var response2);
+        var result2 = str2.TryParseCommandRequest(out var request2);
         Assert.Multiple(() =>
         {
             Assert.That(result1, Is.False);
-            Assert.That(response1, Is.Null);
+            Assert.That(request1, Is.Null);
             Assert.That(result2, Is.False);
-            Assert.That(response2, Is.Null);
+            Assert.That(request2, Is.Null);
         });
     }
 }

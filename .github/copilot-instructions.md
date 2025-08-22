@@ -14,7 +14,7 @@ The library is modular, allowing easy substitution of the underlying communicati
 - `BroadcastMessage(int Id, string Message)` — Sent from server to all clients for notifications.
 
 ## Coding Guidelines
-- Use async/await for all network and I/O operations where possible.
+- Use async/await for all network and I/O operations where possible but build both cases.
 - Follow .NET naming conventions (PascalCase for public members, camelCase for locals/parameters).
 - Document all public APIs with XML comments.
 - Prefer using ArrayPool for buffer management in performance-sensitive code.
@@ -29,29 +29,51 @@ The library is modular, allowing easy substitution of the underlying communicati
 - When in doubt, prefer clarity and maintainability over micro-optimizations.
 
 ## Example Usage
-### Client
-```csharp
-var client = new CommsClientSockets();
-client.Connect(msg => Console.WriteLine($"Broadcast: {msg}"));
-var response = await client.SendCommandAsync(new CommandRequest(1, "HELLO"));
-client.Disconnect();
-```
-
 ### Server
+
 ```csharp
-var server = new CommsServerSockets();
-server.RegisterCommandHandler("HELLO", req => new CommandResponse(true, req.Id.ToString(), "WORLD"));
-server.Start();
-server.Broadcast(new BroadcastMessage(1, "Welcome!"));
+// Create a server using sockets
+NetworkAddress networkAddress = new NetworkAddress("127.0.0.1", 5000);
+ICommsServer server = new CommsServerSockets(networkAddress);
+
+// Start the server and set the command handler.
+server.Start(OnCommandReceived);
+
+// Send a broadcast message to all clients
+server.Broadcast(new BroadcastMessage(100, "Message for all clients"));
+
+// Stop the server
 server.Stop();
+
+// Command handler
+CommandResponse OnCommandReceived(CommandRequest request) {
+    switch (request.Id) {
+        case 1:
+            // Process Command 1
+            // Encode Broadcast messages to avoid conflicts.
+            return new CommandResponse(true, request.Id.ToString(), "Command 1, OK");
+            break;  
+    }
+}
 ```
 
-## Contribution
-- Fork, branch, and submit pull requests for new features or bug fixes.
-- All code must pass CI/CD checks and include appropriate tests.
+### Client
 
-## License
-MIT License. See LICENSE for details.
+```csharp
+// Create a client using sockets
+NetworkAddress networkAddress = new NetworkAddress("127.0.0.1", 5000);
+ICommsClient client = new CommsClientSockets(networkAddress);
+
+// Connect to the server
+client.Connect(OnBroadcastReceived);
+
+// Send a command and get a response
+var command = "1,parameter1,parameter2";
+if (command.TryParseCommandRequest(out commandRequest)) {
+    var response = client.SendCommand(commandRequest);
+    Console.WriteLine($"Success: {response.Success}, ID: {response.Id}, Message: {response.Message}");
+}
+
 
 ---
 _These instructions are for GitHub Copilot and AI agents to provide context-aware, high-quality code suggestions for the McComms project._

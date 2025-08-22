@@ -41,7 +41,7 @@ public static class McCommsExtensions {
             return false;
         }
 
-        var success = bool.TryParse(parts[0], out bool succes) && succes;
+        var success = bool.TryParse(parts[0], out bool successValue) && successValue;
         var id = parts[1];
         var message = parts.Length > 2 ? string.Join(':', parts[2..]) : string.Empty;
         commandResponse = new CommandResponse(success, id, message);

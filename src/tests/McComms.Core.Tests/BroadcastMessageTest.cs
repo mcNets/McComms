@@ -14,7 +14,7 @@ public class BroadcastMessageTest
     public void TryParseBroadcastMessage_ValidString_ParsesCorrectly()
     {
         var str = "1:broadcast";
-        var result = str.TryParseCommandRequest(out var broadcast);
+        var result = str.TryParseBroadcastMessage(out var broadcast);
         Assert.Multiple(() =>
         {
             Assert.That(result, Is.True);
