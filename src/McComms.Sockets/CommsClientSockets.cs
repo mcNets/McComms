@@ -19,10 +19,18 @@ public class CommsClientSockets : ICommsClient, IDisposable {
     /// <summary>
     /// Initializes a new instance of the CommsClientSockets class with specified host and port.
     /// </summary>
-    /// <param name="host">The IP address of the host to connect to.</param>
-    /// <param name="port">The port number to use for the connection.</param>
+    /// <param name="address">The NetworkAddress to connect to.</param>
     public CommsClientSockets(NetworkAddress address) {
         _client = new SocketsClient(address);
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the CommsClientSockets class with specified host, port, and timeout settings.
+    /// </summary>
+    /// <param name="address">The NetworkAddress to connect to.</param>
+    /// <param name="readTimeoutMs">Read timeout in milliseconds.</param>
+    public CommsClientSockets(NetworkAddress address, int readTimeoutMs) {
+        _client = new SocketsClient(address, readTimeoutMs: readTimeoutMs);
     }
 
     /// <summary>
