@@ -174,6 +174,10 @@ public class SocketsClient : IDisposable {
         if (_commandSocket?.Connected == false) {
             throw new InvalidOperationException("Command socket not connected");
         }
+        
+        if (_commandStream == null) {
+            throw new InvalidOperationException("Command stream not initialized");
+        }
 
         if (message.Length == 0) {
             throw new InvalidOperationException("Message is empty");
@@ -190,19 +194,29 @@ public class SocketsClient : IDisposable {
             bool hasResponse = false;
 
             // Send the message on the command stream
-            _commandStream!.Write(message);
+            _commandStream.Write(message);
 
             // Get a buffer from the ArrayPool
             byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(MAX_BUFFER_SIZE);
             try {
-                // Wait for the response
+                // Wait for the response with timeout protection
                 int posBuffer = -1;
                 bool foundSTX = false;
                 _responseBuffer.Clear();
+                
+                var startTime = Environment.TickCount64;
+                var timeoutMs = _readTimeoutMs;
 
                 while (!hasResponse) {
+                    // Check for timeout
+                    if (Environment.TickCount64 - startTime > timeoutMs) {
+                        throw new TimeoutException($"Read operation timed out after {timeoutMs} ms");
+                    }
+                    
                     var bytesRead = _commandStream.Read(buffer, 0, buffer.Length);
                     if (bytesRead == 0) {
+                        // Small delay to avoid busy waiting when no data is available
+                        Thread.Sleep(1);
                         continue;
                     }
 
@@ -239,6 +253,10 @@ public class SocketsClient : IDisposable {
                 System.Buffers.ArrayPool<byte>.Shared.Return(buffer);
             }
         }
+        catch (TimeoutException) {
+            System.Diagnostics.Debug.WriteLine($"McComms.Socket: Send operation timed out after {_readTimeoutMs} ms");
+            throw;
+        }
         catch (Exception ex) {
             System.Diagnostics.Debug.WriteLine($"McComms.Socket ERROR sending message: {ex.Message}");
             throw;
@@ -258,7 +276,13 @@ public class SocketsClient : IDisposable {
     public async Task<byte[]> SendAsync(byte[] message, CancellationToken cancellationToken = default) {
         if (_commandSocket?.Connected == false) {
             throw new InvalidOperationException("Command socket not connected");
-        }        if (message.Length == 0) {
+        }
+        
+        if (_commandStream == null) {
+            throw new InvalidOperationException("Command stream not initialized");
+        }
+        
+        if (message.Length == 0) {
             throw new InvalidOperationException("Message is empty");
         }
         
@@ -274,7 +298,7 @@ public class SocketsClient : IDisposable {
             await _sendSemaphore.WaitAsync(combinedToken);
 
             // Send the message on the command stream
-            await _commandStream!.WriteAsync(message, combinedToken);
+            await _commandStream.WriteAsync(message, combinedToken);
 
             // Get a buffer from the ArrayPool
             byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(MAX_BUFFER_SIZE);
@@ -323,13 +347,12 @@ public class SocketsClient : IDisposable {
                 System.Buffers.ArrayPool<byte>.Shared.Return(buffer);
             }
         }
+        catch (OperationCanceledException) when (timeOutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested) {
+            System.Diagnostics.Debug.WriteLine($"McComms.Socket: SendAsync operation timed out after {_readTimeoutMs} ms");
+            throw new TimeoutException($"Send operation timed out after {_readTimeoutMs} ms");
+        }
         catch (OperationCanceledException) {
-            if (combinedToken.IsCancellationRequested) {
-                System.Diagnostics.Debug.WriteLine("McComms.Socket: Operation was cancelled due to timeout");
-            }
-            else {
-                System.Diagnostics.Debug.WriteLine("McComms.Socket: Operation was cancelled");
-            }
+            System.Diagnostics.Debug.WriteLine("McComms.Socket: SendAsync operation was cancelled");
             throw;
         }
         catch (Exception ex) {

@@ -1,25 +1,28 @@
 # McComms.Core
 
-Base project with common interfaces, models and helpers for the McComms solution. This library provides the basic structure for communication between clients and servers using different technologies.
-
-## Contents
+Base project with common interfaces, models and helpers for the McComms solution. This library provides the basic structure for communication between clients and servers using different technologies. Once implemented, it can be extended to support various transport mechanisms like Sockets, WebSockets, or gRPC.
 
 ### Communication Interfaces
 
-#### ICommsClient
-Interface that defines the operations of a communications client:
-- **Connect(Action<BroadcastMessage>)**: Connects to the server and sets the callback for broadcast messages.
-- **Disconnect()**: Disconnects from the server.
-- **SendCommand(CommandRequest)**: Sends a command to the server and returns the response.
-- **SendExitCommand()**: Sends an exit command to the server.
-- **OnBroadcastReceived**: Property that sets the callback for received broadcast messages.
-
 #### ICommsServer
 Interface that defines the operations of a communications server:
-- **Start(Func<CommandRequest, CommandResponse>, CancellationToken)**: Starts the server with a callback for received commands.
+- **Address**: Gets the address of the server.
+- **Start(Func<CommandRequest, CommandResponse>?, CancellationToken)**: Starts the server with a callback for received commands.
 - **Stop()**: Stops the server.
+- **StopAsync()**: Stops the server asynchronously.
 - **SendBroadcast(BroadcastMessage)**: Sends a broadcast message to all connected clients.
-- **CommandReceived**: Property that sets the callback for received commands.
+- **SendBroadcastAsync(BroadcastMessage, CancellationToken)**: Sends a broadcast message to all connected clients asynchronously.
+
+#### ICommsClient
+Interface that defines the operations of a communications client:
+- **Address**: Gets the address of the server.
+- **Connect(Action<BroadcastMessage>?)**: Connects to the server and sets the callback for broadcast messages.
+- **ConnectAsync(Action<BroadcastMessage>?, CancellationToken)**: Connects to the server asynchronously and sets the callback for broadcast messages.
+- **Disconnect()**: Disconnects from the server.
+- **DisconnectAsync()**: Disconnects from the server asynchronously.
+- **SendCommand(CommandRequest)**: Sends a command to the server and returns the response.
+- **SendCommandAsync(CommandRequest, CancellationToken)**: Sends a command to the server asynchronously and returns the response.
+- **OnBroadcastReceived**: Property that sets the callback for received broadcast messages.
 
 ### Data Models
 
@@ -49,13 +52,6 @@ Class with extension methods for processing communication formats:
 - **TryParseCommandRequest(string)**: Attempts to parse a string in "Id:Message" format into a CommandRequest.
 - **TryParseCommandResponse(string)**: Attempts to parse a string in "Success:Id:Message" format into a CommandResponse.
 - **TryParseBroadcastMessage(string)**: Attempts to parse a string in "Id:Message" format into a BroadcastMessage.
-
-#### MsgHelper
-Class with methods for creating command responses:
-- **Ok()**: Creates a successful response without a message.
-- **Ok(string)**: Creates a successful response with a message.
-- **Fail()**: Creates a failed response without a message.
-- **Fail(string, string)**: Creates a failed response with an ID and a message.
 
 ## Implementations
 This core library is implemented by other projects in the solution:

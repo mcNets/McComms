@@ -6,9 +6,9 @@ McComms is a flexible communications library that provides client and server imp
 
 McComms is designed to offer a common interface for client-server communications, allowing different underlying implementations. Currently, the following technologies are supported:
 
-- **TCP/IP Sockets** - Socket-based communications implementation
-- **gRPC** - gRPC-based communications implementation
-- **WebSockets** - WebSockets-based communications implementation
+- **TCP/IP Sockets** - Socket-based communications implementation.
+- **gRPC** - gRPC-based communications implementation.
+- **WebSockets** - WebSockets-based communications implementation.
 
 The library is structured to allow easy substitution of the communication technology without changing the main application code.
 
@@ -24,8 +24,8 @@ The library is structured to allow easy substitution of the communication techno
     | CommandRequest(Id, Message)   |
     |------------------------------>|
     |                               | Process
-    |                               | Command
-    |                               |
+                                    | Command
+                                    |
     | CommandResponse(Success, Id, Message)
     |<------------------------------|
     |                               |
@@ -59,12 +59,6 @@ public record CommandResponse(bool Success = false, string? Id = "", string? Mes
 | Server |                      | Client |
 +--------+                      +--------+
     |                               |
-    | BroadcastMessage(Id, Message) |
-    |------------------------------>|
-    |                               |
-    |                      +--------+
-    |                      | Client |
-    |                      +--------+
     | BroadcastMessage(Id, Message) |
     |------------------------------>|
     |                               |
@@ -111,9 +105,9 @@ This project uses GitHub Actions for continuous integration and delivery. The wo
 The project is available as NuGet packages from GitHub Packages:
 
 ```
-dotnet add package McComms.Sockets --version <VERSION>
-dotnet add package McComms.gRPC --version <VERSION>
-dotnet add package McComms.WebSockets --version <VERSION>
+dotnet add package McComms.Sockets --version [![NuGet](https://img.shields.io/nuget/v/McComms.Sockets.svg?label=McComms.Sockets)](https://www.nuget.org/packages/McComms.Sockets)
+dotnet add package McComms.gRPC --version [![NuGet](https://img.shields.io/nuget/v/McComms.gRPC.svg?label=McComms.gRPC)](https://www.nuget.org/packages/McComms.gRPC)
+dotnet add package McComms.WebSockets --version [![NuGet](https://img.shields.io/nuget/v/McComms.WebSockets.svg?label=McComms.WebSockets)](https://www.nuget.org/packages/McComms.WebSockets)
 ```
 
 Or through Package Manager:
@@ -126,47 +120,65 @@ Install-Package McComms.WebSockets
 
 ## Basic Usage
 
-### Client
-
-```csharp
-// Create a client using sockets
-var client = new CommsClientSockets();
-
-// Connect to the server
-client.Connect(message => {
-    Console.WriteLine($"Broadcast received: {message}");
-});
-
-// Send a command and get a response
-var response = client.SendCommand(new CommandRequest("COMMAND", "parameters"));
-
-// Or using async/await
-var response = await client.SendCommandAsync(new CommandRequest("COMMAND", "parameters"));
-
-// Disconnect
-client.Disconnect();
-```
-
 ### Server
 
 ```csharp
 // Create a server using sockets
-var server = new CommsServerSockets();
+NetworkAddress networkAddress = new NetworkAddress("127.0.0.1", 5000);
+ICommsServer server = new CommsServerSockets(networkAddress);
 
-// Register command handlers
-server.RegisterCommandHandler("COMMAND", (request) => {
-    return new CommandResponse("OK");
-});
-
-// Start the server
-server.Start();
+// Start the server and set the command handler.
+server.Start(OnCommandReceived);
 
 // Send a broadcast message to all clients
-server.Broadcast(new BroadcastMessage("INFO", "Message for all clients"));
+server.Broadcast(new BroadcastMessage(100, "Message for all clients"));
 
 // Stop the server
 server.Stop();
+
+// Command handler
+CommandResponse OnCommandReceived(CommandRequest request) {
+    switch (request.Id) {
+        case 1:
+            // Process Command 1
+            // Encode Broadcast messages to avoid conflicts.
+            return new CommandResponse(true, request.Id.ToString(), "Command 1, OK");
+            break;  
+    }
+}
 ```
+
+### Client
+
+```csharp
+// Create a client using sockets
+NetworkAddress networkAddress = new NetworkAddress("127.0.0.1", 5000);
+ICommsClient client = new CommsClientSockets(networkAddress);
+
+// Connect to the server
+client.Connect(OnBroadcastReceived);
+
+// Send a command and get a response
+var command = "1,parameter1,parameter2";
+if (command.TryParseCommandRequest(out commandRequest)) {
+    var response = client.SendCommand(commandRequest);
+    Console.WriteLine($"Success: {response.Success}, ID: {response.Id}, Message: {response.Message}");
+}
+
+// Disconnect
+client.Disconnect();
+
+// Broadcast message handler
+void OnBroadcastReceived(BroadcastMessage message) {
+    switch (message.Id) {
+        case 100:
+            // Process broadcast.
+            Console.WriteLine($"Broadcast: {message.Id}, Message: {message.Message}");
+            break;
+    }
+}
+```
+
 
 ## Support for Synchronous and Asynchronous Operations
 
@@ -174,10 +186,10 @@ All main operations support both synchronous and asynchronous versions, allowing
 
 ```csharp
 // Synchronous version
-var response = client.SendCommand(new CommandRequest("COMMAND", "data"));
+var response = client.SendCommand(new CommandRequest(100, "data"));
 
 // Asynchronous version
-var response = await client.SendCommandAsync(new CommandRequest("COMMAND", "data"));
+var response = await client.SendCommandAsync(new CommandRequest(100, "data"), cancellationToken);
 ```
 
 ## Contribution
