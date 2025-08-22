@@ -104,10 +104,15 @@ This project uses GitHub Actions for continuous integration and delivery. The wo
 
 The project is available as NuGet packages from GitHub Packages:
 
+[![NuGet](https://img.shields.io/nuget/v/McComms.Core.svg?label=McComms.Core)](https://www.nuget.org/packages/McComms.Core)
+[![NuGet](https://img.shields.io/nuget/v/McComms.Sockets.svg?label=McComms.Sockets)](https://www.nuget.org/packages/McComms.Sockets)
+[![NuGet](https://img.shields.io/nuget/v/McComms.gRPC.svg?label=McComms.gRPC)](https://www.nuget.org/packages/McComms.gRPC)
+[![NuGet](https://img.shields.io/nuget/v/McComms.WebSockets.svg?label=McComms.WebSockets)](https://www.nuget.org/packages/McComms.WebSockets)
+
 ```
-dotnet add package McComms.Sockets --version [![NuGet](https://img.shields.io/nuget/v/McComms.Sockets.svg?label=McComms.Sockets)](https://www.nuget.org/packages/McComms.Sockets)
-dotnet add package McComms.gRPC --version [![NuGet](https://img.shields.io/nuget/v/McComms.gRPC.svg?label=McComms.gRPC)](https://www.nuget.org/packages/McComms.gRPC)
-dotnet add package McComms.WebSockets --version [![NuGet](https://img.shields.io/nuget/v/McComms.WebSockets.svg?label=McComms.WebSockets)](https://www.nuget.org/packages/McComms.WebSockets)
+dotnet add package McComms.Sockets --version <VERSION>
+dotnet add package McComms.gRPC --version <VERSION>
+dotnet add package McComms.WebSockets --version <VERSION>
 ```
 
 Or through Package Manager:
