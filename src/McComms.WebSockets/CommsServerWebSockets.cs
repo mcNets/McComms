@@ -29,7 +29,7 @@ public class CommsServerWebSockets : ICommsServer {
     /// </summary>
     public Func<CommandRequest, CommandResponse>? CommandReceived { get; set; }
 
-    public CommsAddress Address => throw new NotImplementedException();
+    public NetworkAddress Address => throw new NotImplementedException();
 
     /// <summary>
     /// Starts the server and begins listening for incoming connections and commands.
@@ -98,6 +98,10 @@ public class CommsServerWebSockets : ICommsServer {
     }
 
     public Task SendBroadcastAsync(BroadcastMessage msg) {
+        throw new NotImplementedException();
+    }
+
+    public Task SendBroadcastAsync(BroadcastMessage msg, CancellationToken token = default) {
         throw new NotImplementedException();
     }
 }

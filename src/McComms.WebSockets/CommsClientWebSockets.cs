@@ -15,7 +15,7 @@ public class CommsClientWebSockets : ICommsClient {
     /// </summary>
     public Action<BroadcastMessage>? OnBroadcastReceived { get; set; }
 
-    public CommsAddress Address => throw new NotImplementedException();
+    public NetworkAddress Address => throw new NotImplementedException();
 
     /// <summary>
     /// Initializes a new instance of the CommsClientWebSockets class with default server address and port.
@@ -38,7 +38,7 @@ public class CommsClientWebSockets : ICommsClient {
     /// </summary>
     /// <param name="onBroadcastReceived">Callback invoked when a broadcast message is received.</param>
     /// <returns>True if connection is successful, false otherwise.</returns>
-    public bool Connect(Action<BroadcastMessage> onBroadcastReceived) {
+    public bool Connect(Action<BroadcastMessage>? onBroadcastReceived) {
         _onBroadcastReceived = onBroadcastReceived;
         
         try {
