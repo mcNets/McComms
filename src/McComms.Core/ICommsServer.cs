@@ -41,5 +41,6 @@ public interface ICommsServer {
     /// Sends a broadcast message to all connected clients asynchronously.
     /// </summary>
     /// <param name="msg">The broadcast message to send.</param>
-    Task SendBroadcastAsync(BroadcastMessage msg);
+    /// <param name="token">Cancellation token to cancel the operation.</param>
+    Task SendBroadcastAsync(BroadcastMessage msg, CancellationToken token = default);
 }

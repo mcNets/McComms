@@ -11,7 +11,7 @@ public sealed class GrpcServer : mcServeis.mcServeisBase {
     public const int DEFAULT_PORT = 50051;
 
     private readonly Server? _server;
-    private readonly CommsHost _commsHost = new(DEFAULT_HOST, DEFAULT_PORT);
+    private readonly NetworkAddress _commsHost = new(DEFAULT_HOST, DEFAULT_PORT);
     private readonly List<IServerStreamWriter<mcBroadcast>> _broadcastWriters = [];
     private readonly Lock _broadcastWritersLock = new();
 
@@ -30,7 +30,7 @@ public sealed class GrpcServer : mcServeis.mcServeisBase {
     /// <summary>
     /// Gets the CommsHost object that contains the host and port information
     /// </summary>
-    public CommsHost Address => _commsHost;
+    public NetworkAddress Address => _commsHost;
 
     /// <summary>
     /// Default constructor that initializes the server on the default host and port
@@ -45,9 +45,9 @@ public sealed class GrpcServer : mcServeis.mcServeisBase {
     /// <summary>
     /// Constructor that allows specifying host and port for the server
     /// </summary>
-    /// <param name="commsHost">The CommsHost object containing the host and port information</param>
-    public GrpcServer(CommsHost commsHost, ServerCredentials credentials, IEnumerable<ChannelOption>? channelOptions = null) {
-        _commsHost = commsHost;
+    /// <param name="address">The CommsHost object containing the host and port information</param>
+    public GrpcServer(NetworkAddress address, ServerCredentials credentials, IEnumerable<ChannelOption>? channelOptions = null) {
+        _commsHost = address;
         _server = new Server(channelOptions) {
             Services = { mcServeis.BindService(this) },
             Ports = { new ServerPort(Address.Host, Address.Port, credentials) }

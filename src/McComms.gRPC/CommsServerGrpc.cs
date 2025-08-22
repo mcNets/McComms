@@ -36,8 +36,8 @@ public class CommsServerGrpc : ICommsServer
     /// </summary>
     /// <param name="host">Address where the server will listen</param>
     /// <param name="port">Port where the server will listen</param>
-    public CommsServerGrpc(CommsHost commsHost) {
-        _grpcServer = new GrpcServer(commsHost: commsHost, credentials: Credentials, channelOptions: ChannelOptions);
+    public CommsServerGrpc(NetworkAddress address) {
+        _grpcServer = new GrpcServer(address: address, credentials: Credentials, channelOptions: ChannelOptions);
     }
 
     /// <summary>
