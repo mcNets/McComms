@@ -3,19 +3,21 @@
 /// <summary>
 /// Implementation of ICommsServer based on gRPC.
 /// This class adapts the functionality of GrpcServer to the standard ICommsServer interface.
-/// In case you needed it, you can use ChannelOptions to add custom behavior to the gRPC server.
+/// In case you needed it, you can use ChannelOptions and Credentialsto add custom behavior to the gRPC server.
 /// </summary>
-public class CommsServerGrpc : ICommsServer
+public sealed class CommsServerGrpc : ICommsServer
 {
     private readonly GrpcServer _grpcServer;
 
     /// <summary>
-    /// List of channel options for the gRPC server
+    /// List of channel options for the gRPC server.
+    /// By default, the server doesn't use any channel options.
     /// </summary>
     public List<ChannelOption> ChannelOptions { get; } = [];
 
     /// <summary>
     /// Gets the Credentials information for the communications server.
+    /// By default, the server uses insecure credentials.
     /// </summary>
     public ServerCredentials Credentials { get; set; } = ServerCredentials.Insecure;
 
@@ -23,6 +25,11 @@ public class CommsServerGrpc : ICommsServer
     /// Gets the CommsAddress object that contains the host and port information
     /// </summary>
     public NetworkAddress Address => _grpcServer.Address;
+
+    /// <summary>
+    /// Gets the protocol used by the communications server.
+    /// </summary>
+    public CommsProtocol Protocol => CommsProtocol.gRPC;
 
     /// <summary>
     /// Default constructor that initializes the server with default settings
@@ -34,8 +41,7 @@ public class CommsServerGrpc : ICommsServer
     /// <summary>
     /// Constructor that allows specifying host and port for the server
     /// </summary>
-    /// <param name="host">Address where the server will listen</param>
-    /// <param name="port">Port where the server will listen</param>
+    /// <param name="address">The NetworkAddress object containing the host and port information</param>
     public CommsServerGrpc(NetworkAddress address) {
         _grpcServer = new GrpcServer(address: address, credentials: Credentials, channelOptions: ChannelOptions);
     }
@@ -52,10 +58,12 @@ public class CommsServerGrpc : ICommsServer
     /// <param name="stoppingToken">Cancellation token to stop the server</param>
     public void Start(Func<CommandRequest, CommandResponse>? onCommandReceived, CancellationToken stoppingToken) {
         CommandReceived = onCommandReceived;
+
         // Monitor the cancellation token and stop the server when triggered
         stoppingToken.Register(() => {
             Stop();
         });
+
         _grpcServer.Start(OnCommandReceived);
     }
 

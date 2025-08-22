@@ -50,6 +50,23 @@ jobs:
       - name: Push McComms.Core to NuGet
         run: dotnet nuget push src/Packages/McComms.Core.*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
 
+      # McComms.gRPC
+      # -------------------------------------------------------------------------------------------------------------
+      - name: Restore McComms.gRPC
+        run: dotnet restore src/McComms.gRPC/McComms.gRPC.csproj
+
+      - name: Build McComms.gRPC
+        run: dotnet build src/McComms.gRPC/McComms.gRPC.csproj --configuration Release
+
+      - name: Test McComms.gRPC
+        run: dotnet test src/tests/McComms.gRPC.Tests/McComms.gRPC.Tests.csproj --no-build --configuration Release
+
+      - name: Pack McComms.gRPC
+        run: dotnet pack src/McComms.gRPC/McComms.gRPC.csproj -o ./src/Packages --configuration Release
+
+      - name: Push McComms.gRPC to NuGet
+        run: dotnet nuget push src/Packages/McComms.gRPC.*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+        
       # McComms.gRPC, McComms.Sockets, McComms.WebSockets
       # -------------------------------------------------------------------------------------------------------------
       # - name: Restore dependencies

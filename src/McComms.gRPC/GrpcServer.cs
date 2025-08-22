@@ -72,15 +72,16 @@ public sealed class GrpcServer : mcServeis.mcServeisBase {
         OnCommandReceived = onCommandReceived;
 
         try {
+            IsRunning = false;
             _server.Start();
+            IsRunning = true;
         }
         catch (Exception ex) {
             Debug.WriteLine($"Error starting server: {ex.Message}");
             return false;
         }
 
-        IsRunning = true;
-        return true;
+        return IsRunning;
     }
 
     /// <summary>
@@ -127,10 +128,7 @@ public sealed class GrpcServer : mcServeis.mcServeisBase {
         }
         catch (Exception ex) {
             Debug.WriteLine($"Error processing command {request.Id}: {ex.Message}");
-            return Task.FromResult(new mcCommandResponse { 
-                Success = false, 
-                Id = request.Id.ToString(), 
-                Message = $"Error processing command: {ex.Message}" 
+            return Task.FromResult(new mcCommandResponse { Success = false, Id = request.Id.ToString(), Message = $"Error processing command: {ex.Message}" 
             });
         }
     }

@@ -57,14 +57,5 @@ public class CommsClientGrpcTests
         // Act & Assert - should delegate to GrpcClient.Disconnect
         Assert.DoesNotThrow(() => client.Disconnect());
     }
-    
-    [Test]
-    public void SendExitCommand_ShouldCallDisconnect()
-    {
-        // Arrange
-        var client = new CommsClientGrpc();
 
-        // Act & Assert
-        Assert.DoesNotThrow(() => client.SendExitCommand());
-    }
 }

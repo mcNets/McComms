@@ -4,7 +4,7 @@
 /// Implementation of ICommsClient based on gRPC.
 /// This class adapts the functionality of GrpcClient to the standard ICommsClient interface.
 /// </summary>
-public class CommsClientGrpc : ICommsClient
+public sealed class CommsClientGrpc : ICommsClient
 {
     private readonly GrpcClient _client;
 
@@ -12,6 +12,11 @@ public class CommsClientGrpc : ICommsClient
     /// Gets the NetworkAddress object that contains the host and port information
     /// </summary>
     public NetworkAddress Address => _client.Address; 
+
+    /// <summary>
+    /// Gets the protocol used by the communications client.
+    /// </summary>
+    public CommsProtocol Protocol => CommsProtocol.gRPC;
     
     /// <summary>
     /// Default constructor that initializes the client with default settings
@@ -93,12 +98,5 @@ public class CommsClientGrpc : ICommsClient
     public async Task<CommandResponse> SendCommandAsync(CommandRequest msg, CancellationToken token = default) {
         var response = await _client.SendCommandAsync(new mcCommandRequest { Id = msg.Id, Content = msg.Message }, token);
         return new CommandResponse(response.Success, response.Id, response.Message);
-    }
-
-    /// <summary>
-    /// Sends an exit command to the server and disconnects
-    /// </summary>
-    public void SendExitCommand() {
-        Disconnect();
     }
 }
