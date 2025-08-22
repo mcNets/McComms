@@ -10,6 +10,11 @@ public interface ICommsClient {
     NetworkAddress Address { get; }
 
     /// <summary>
+    /// Gets the protocol used by the communications client.
+    /// </summary>
+    CommsProtocol Protocol { get; }
+
+    /// <summary>
     /// Connects to the server and sets the callback for broadcast messages.
     /// </summary>
     /// <param name="onBroadcastReceived">Callback invoked when a broadcast message is received.</param>

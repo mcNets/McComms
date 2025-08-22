@@ -10,6 +10,11 @@ public interface ICommsServer {
     NetworkAddress Address { get; }
 
     /// <summary>
+    /// Gets the protocol used by the communications server.
+    /// </summary>
+    CommsProtocol Protocol { get; }
+
+    /// <summary>
     /// Gets or sets the callback for when a command is received from a client.
     /// </summary>
     Func<CommandRequest, CommandResponse>? CommandReceived { get; set; }
