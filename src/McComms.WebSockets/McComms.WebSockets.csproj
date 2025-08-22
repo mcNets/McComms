@@ -11,11 +11,9 @@
     <Description>WebSockets implementation for McComms</Description>
     <Copyright>Joan Magnet</Copyright>
 
-    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <RepositoryUrl>https://github.com/mcnets/McComms</RepositoryUrl>
     <PackageProjectUrl>https://github.com/mcnets/McComms</PackageProjectUrl>
     <PackageReadmeFile>Readme.md</PackageReadmeFile>
-    <PackageOutputPath>..\Packages</PackageOutputPath>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageId>McComms.WebSockets</PackageId>
     <PackageIcon>mccomms-websockets.png</PackageIcon>

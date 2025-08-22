@@ -13,11 +13,9 @@
 		<Description>gRPC implementation for McComms</Description>
 		<Copyright>Joan Magnet</Copyright>
 
-		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<RepositoryUrl>https://github.com/mcnets/McComms</RepositoryUrl>
 		<PackageProjectUrl>https://github.com/mcnets/McComms</PackageProjectUrl>
 		<PackageReadmeFile>Readme.md</PackageReadmeFile>
-		<PackageOutputPath>..\Packages</PackageOutputPath>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PackageId>McComms.gRPC</PackageId>
 		<PackageIcon>mccomms-grpc.png</PackageIcon>
