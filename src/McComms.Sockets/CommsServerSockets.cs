@@ -8,6 +8,16 @@ public class CommsServerSockets : ICommsServer {
     private readonly SocketsServer _socketServer;
 
     /// <summary>
+    /// Gets the underlying gRPC server instance
+    /// summary>
+    public NetworkAddress Address => _socketServer.Address;
+
+    /// <summary>
+    /// Callback function that is invoked when a command is received.
+    /// </summary>
+    public Func<CommandRequest, CommandResponse>? CommandReceived { get; set; }
+
+    /// <summary>
     /// Initializes a new instance of the CommsServerSockets class with default host and port.
     /// </summary>
     public CommsServerSockets() {
@@ -17,21 +27,10 @@ public class CommsServerSockets : ICommsServer {
     /// <summary>
     /// Initializes a new instance of the CommsServerSockets class with specified host and port.
     /// </summary>
-    /// <param name="ipAddress">The IP address to listen on.</param>
-    /// <param name="port">The port number to use for the server.</param>
-    public CommsServerSockets(IPAddress ipAddress, int port) {
-        _socketServer = new SocketsServer(ipAddress, port);
+    /// <param name="address">The NetworkAddress to listen on.</param>
+    public CommsServerSockets(NetworkAddress address) {
+        _socketServer = new SocketsServer(address);
     }
-
-    /// <summary>
-    /// Gets the underlying gRPC server instance
-    /// summary>
-    public NetworkAddress Address => _socketServer.Address;
-
-    /// <summary>
-    /// Callback function that is invoked when a command is received.
-    /// </summary>
-    public Func<CommandRequest, CommandResponse>? CommandReceived { get; set; }
 
     /// <summary>
     /// Starts the server and begins listening for incoming connections and commands.
@@ -49,6 +48,10 @@ public class CommsServerSockets : ICommsServer {
     public void Stop() {
         _socketServer.Dispose();
     }
+    
+    public Task StopAsync() {
+        return Task.Run(() => _socketServer.Dispose());
+    }
 
     /// <summary>
     /// Sends a broadcast message to all connected clients.
@@ -63,9 +66,9 @@ public class CommsServerSockets : ICommsServer {
     /// Sends a broadcast message to all connected clients.
     /// </summary>
     /// <param name="msg">The broadcast message to send.</param>
-    public async Task SendBroadcastAsync(BroadcastMessage msg) {
+    public async Task SendBroadcastAsync(BroadcastMessage msg, CancellationToken token = default) {
         // Fire and forget - SendBroadcast does not catch exceptions.
-        await _socketServer.SendBroadcastAsync(SocketsHelper.Encode(msg.ToString()));
+        await _socketServer.SendBroadcastAsync(SocketsHelper.Encode(msg.ToString()), token);
     }
 
     /// <summary>

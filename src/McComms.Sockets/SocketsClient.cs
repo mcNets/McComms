@@ -42,7 +42,7 @@ public class SocketsClient : IDisposable {
     private readonly SemaphoreSlim _sendSemaphore = new(1, 1);
 
     // CommsHost object for host and port information
-    private readonly NetworkAddress? _address;
+    private readonly NetworkAddress _address = new(DEFAULT_HOST, DEFAULT_PORT);
 
     /// <summary>
     /// Callback invoked when a message is received from the server.
@@ -61,36 +61,6 @@ public class SocketsClient : IDisposable {
     private readonly List<byte> _responseBuffer = new(MAX_BUFFER_SIZE);
 
     /// <summary>
-    /// Default constructor. Connects to localhost and default port.
-    /// </summary>
-    public SocketsClient()
-        : this(IPAddress.Parse(DEFAULT_HOST), DEFAULT_PORT, DEFAULT_POLL_DELAY_MS, DEFAULT_READ_TIMEOUT_MS) {
-    }
-
-    /// <summary>
-    /// Constructor with custom host and port.
-    /// </summary>
-    public SocketsClient(IPAddress host, int port) 
-        : this(host, port, DEFAULT_POLL_DELAY_MS, DEFAULT_READ_TIMEOUT_MS) {
-    }
-
-    /// <summary>
-    /// Constructor with custom host, port, and poll delay.
-    /// </summary>
-    /// <param name="host">IP address of the host to connect to</param>
-    /// <param name="port">Port number to use for commands</param>
-    /// <param name="pollDelayMs">Delay in milliseconds between polls when no data is available</param>
-    public SocketsClient(IPAddress host, int port, int pollDelayMs = DEFAULT_POLL_DELAY_MS, int readTimeoutMs = DEFAULT_READ_TIMEOUT_MS) {
-        _address = new CommsHost(host.ToString(), port);
-        _commandEndPoint = new IPEndPoint(host, port);
-        _broadcastEndPoint = new IPEndPoint(host, port + 1);
-        _commandSocket = new Socket(_commandEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-        _broadcastSocket = new Socket(_broadcastEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-        _pollDelayMs = pollDelayMs > 0 ? pollDelayMs : DEFAULT_POLL_DELAY_MS;
-        _readTimeoutMs = readTimeoutMs > 0 ? readTimeoutMs : DEFAULT_READ_TIMEOUT_MS;
-    }
-
-    /// <summary>
     /// Gets the CommsHost object that contains the host and port information
     /// </summary>
     public NetworkAddress Address => _address ?? throw new InvalidOperationException("CommsHost is not initialized. Please ensure the client is properly constructed.");
@@ -99,6 +69,28 @@ public class SocketsClient : IDisposable {
     /// Gets the current state of the socket connections.
     /// </summary>
     public bool IsConnected => _commandSocket.Connected && _broadcastSocket.Connected;
+
+    /// <summary>
+    /// Default constructor. Connects with default settings.
+    /// </summary>
+    public SocketsClient()
+        : this(new NetworkAddress(DEFAULT_HOST, DEFAULT_PORT), DEFAULT_POLL_DELAY_MS, DEFAULT_READ_TIMEOUT_MS) {
+    }
+
+    /// <summary>
+    /// Constructor with custom host, port, and poll delay.
+    /// </summary>
+    /// <param name="address">The NetworkAddress to connect to.</param>
+    /// <param name="pollDelayMs">Delay in milliseconds between polls when no data is available</param>
+    public SocketsClient(NetworkAddress address, int pollDelayMs = DEFAULT_POLL_DELAY_MS, int readTimeoutMs = DEFAULT_READ_TIMEOUT_MS) {
+        _address = address;
+        _commandEndPoint = new IPEndPoint(IPAddress.Parse(address.Host), address.Port);
+        _broadcastEndPoint = new IPEndPoint(IPAddress.Parse(address.Host), address.Port + 1);
+        _commandSocket = new Socket(_commandEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+        _broadcastSocket = new Socket(_broadcastEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+        _pollDelayMs = pollDelayMs > 0 ? pollDelayMs : DEFAULT_POLL_DELAY_MS;
+        _readTimeoutMs = readTimeoutMs > 0 ? readTimeoutMs : DEFAULT_READ_TIMEOUT_MS;
+    }
 
     /// <summary>
     /// Connects to a server and starts background message listening (synchronous version).
@@ -139,20 +131,21 @@ public class SocketsClient : IDisposable {
     /// Connects to the server and starts background message listening asynchronously.
     /// </summary>
     /// <param name="onMessageReceived">Callback for received messages</param>
+    /// <param name="cancellationToken">Cancellation token to cancel the connection operation</param>
     /// <returns>True if connected</returns>
-    public async Task<bool> ConnectAsync(Action<ReadOnlySpan<byte>> onMessageReceived) {
+    public async Task<bool> ConnectAsync(Action<ReadOnlySpan<byte>> onMessageReceived, CancellationToken cancellationToken = default) {
         // Set the callback for received messages
         OnMessageReceived = onMessageReceived;
 
         try {
             // Connect to the command server endpoint
-            await _commandSocket.ConnectAsync(_commandEndPoint);
+            await _commandSocket.ConnectAsync(_commandEndPoint, cancellationToken);
             if (_commandSocket.Connected == false) {
                 throw new Exception("Cannot connect to the command server.");
             }
 
             // Connect to the broadcast server endpoint (port + 1)
-            await _broadcastSocket.ConnectAsync(_broadcastEndPoint);
+            await _broadcastSocket.ConnectAsync(_broadcastEndPoint, cancellationToken);
             if (_broadcastSocket.Connected == false) {
                 throw new Exception("Cannot connect to the broadcast server.");
             }

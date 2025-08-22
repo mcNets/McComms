@@ -60,8 +60,8 @@ jobs:
       - name: Test McComms.gRPC
         run: dotnet test src/tests/McComms.gRPC.Tests/McComms.gRPC.Tests.csproj --no-build --configuration Release
 
-      # - name: Test McComms.Sockets
-      #   run: dotnet test src/tests/McComms.Sockets.Tests/McComms.Sockets.Tests.csproj --no-build --configuration Release
+      - name: Test McComms.Sockets
+        run: dotnet test src/tests/McComms.Sockets.Tests/McComms.Sockets.Tests.csproj --no-build --configuration Release
 
       - name: Push packages to NuGet.org
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')

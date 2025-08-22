@@ -17,7 +17,7 @@ public class CommsSocketsIntegrationTests
     public async Task OneTimeSetup()
     {
         _serverCts = new CancellationTokenSource();
-        _server = new CommsServerSockets(IPAddress.Parse(_host), _basePort);
+        _server = new CommsServerSockets(new NetworkAddress(_host, _basePort));
         
         // Start the server with a message handler
         _server.Start(commandReceived: (request) =>
@@ -56,7 +56,7 @@ public class CommsSocketsIntegrationTests
     public void ClientServer_SingleClient_SendCommandReceivesResponse()
     {
         // Create and connect client
-        var client = new CommsClientSockets(IPAddress.Parse(_host), _basePort);
+        var client = new CommsClientSockets(new NetworkAddress(_host, _basePort));
         var connected = client.Connect(onBroadcastReceived: (msg) => { 
             // Handle broadcast messages if needed
         });
@@ -85,7 +85,7 @@ public class CommsSocketsIntegrationTests
     public async Task ClientServer_SingleClient_SendCommandAsyncReceivesResponse()
     {
         // Create and connect client
-        var client = new CommsClientSockets(IPAddress.Parse(_host), _basePort);
+        var client = new CommsClientSockets(new NetworkAddress(_host, _basePort));
         var connected = await client.ConnectAsync(onBroadcastReceived: (msg) => { 
             // Handle broadcast messages if needed
         });
@@ -113,8 +113,8 @@ public class CommsSocketsIntegrationTests
     public void ClientServer_MultipleClients_AllReceiveResponses()
     {
         // Create and connect multiple clients
-        var client1 = new CommsClientSockets(IPAddress.Parse(_host), _basePort);
-        var client2 = new CommsClientSockets(IPAddress.Parse(_host), _basePort);
+        var client1 = new CommsClientSockets(new NetworkAddress(_host, _basePort));
+        var client2 = new CommsClientSockets(new NetworkAddress(_host, _basePort));
 
         var connected1 = client1.Connect((_) => { });
         var connected2 = client2.Connect((_) => { });
@@ -150,8 +150,8 @@ public class CommsSocketsIntegrationTests
     public async Task ClientServer_MultipleClientsAsync_AllReceiveResponses()
     {
         // Create and connect multiple clients
-        var client1 = new CommsClientSockets(IPAddress.Parse(_host), _basePort);
-        var client2 = new CommsClientSockets(IPAddress.Parse(_host), _basePort);
+        var client1 = new CommsClientSockets(new NetworkAddress(_host, _basePort));
+        var client2 = new CommsClientSockets(new NetworkAddress(_host, _basePort));
 
         var connected1 = await client1.ConnectAsync((_) => { });
         var connected2 = await client2.ConnectAsync((_) => { });
@@ -193,8 +193,8 @@ public class CommsSocketsIntegrationTests
         var client2Event = new ManualResetEvent(false);
 
         // Create and connect clients with broadcast handlers
-        var client1 = new CommsClientSockets(IPAddress.Parse(_host), _basePort);
-        var client2 = new CommsClientSockets(IPAddress.Parse(_host), _basePort);
+        var client1 = new CommsClientSockets(new NetworkAddress(_host, _basePort));
+        var client2 = new CommsClientSockets(new NetworkAddress(_host, _basePort));
 
         var connected1 = client1.Connect(msg => {
             client1ReceivedMessages.Add(msg);
@@ -247,7 +247,7 @@ public class CommsSocketsIntegrationTests
     [Order(6)]
     public void ClientServer_Clients_ReceiveLongResponse()
     {
-        var client = new CommsClientSockets(IPAddress.Parse(_host), _basePort);
+        var client = new CommsClientSockets(new NetworkAddress(_host, _basePort));
 
         var connected = client.Connect((_) => { });
 
@@ -272,7 +272,7 @@ public class CommsSocketsIntegrationTests
     public async Task ClientServer_AsyncDisconnect_ClosesConnection()
     {
         // Create and connect client
-        var client = new CommsClientSockets(IPAddress.Parse(_host), _basePort);
+        var client = new CommsClientSockets(new NetworkAddress(_host, _basePort));
         var connected = await client.ConnectAsync((_) => { });
         
         Assert.That(connected, Is.True, "Client failed to connect to server");
@@ -295,7 +295,7 @@ public class CommsSocketsIntegrationTests
         var secondCommandCompleted = new TaskCompletionSource<CommandResponse>();
         
         // Create and connect client
-        var client = new CommsClientSockets(IPAddress.Parse(_host), _basePort);
+        var client = new CommsClientSockets(new NetworkAddress(_host, _basePort));
         var connected = await client.ConnectAsync(onBroadcastReceived: async (broadcast) => 
         {
             // When broadcast is received, send another command
@@ -352,8 +352,8 @@ public class CommsSocketsIntegrationTests
     public async Task ClientServer_SingleClient_ReceiveBroadcast()
     {
         var broadcastReceived = new TaskCompletionSource<BroadcastMessage>();
-        
-        var client = new CommsClientSockets(IPAddress.Parse(_host), _basePort);
+
+        var client = new CommsClientSockets(new NetworkAddress(_host, _basePort));
         var connected = await client.ConnectAsync(onBroadcastReceived: (msg) =>
         {
             // Handle broadcast messages if needed
@@ -381,7 +381,7 @@ public class CommsSocketsIntegrationTests
         CommsClientSockets client = null!;
         
         // Test using block to ensure disposal
-        using (client = new CommsClientSockets(IPAddress.Parse(_host), _basePort))
+        using (client = new CommsClientSockets(new NetworkAddress(_host, _basePort)))
         {
             var connected = await client.ConnectAsync(onBroadcastReceived: (msg) =>
             {
@@ -442,7 +442,7 @@ public class CommsSocketsIntegrationTests
         {
             for (int i = 0; i < cycleCount; i++)
             {
-                var client = new CommsClientSockets(IPAddress.Parse(_host), _basePort);
+                var client = new CommsClientSockets(new NetworkAddress(_host, _basePort));
                 clients.Add(client);
 
                 // Connect
@@ -501,7 +501,7 @@ public class CommsSocketsIntegrationTests
     public async Task ResourceManagement_EventHandlerCleanup_PreventMemoryLeaks()
     {
         var broadcastCallbackExecuted = false;
-        var client = new CommsClientSockets(IPAddress.Parse(_host), _basePort);
+        var client = new CommsClientSockets(new NetworkAddress(_host, _basePort));
 
         // Create a reference to the callback to verify it gets cleared
         Action<BroadcastMessage> broadcastCallback = (msg) =>
@@ -524,7 +524,7 @@ public class CommsSocketsIntegrationTests
         client.Disconnect();
 
         // Reconnect with new callback to trigger server broadcast
-        var newClient = new CommsClientSockets(IPAddress.Parse(_host), _basePort);
+        var newClient = new CommsClientSockets(new NetworkAddress(_host, _basePort));
         var reconnected = await newClient.ConnectAsync(onBroadcastReceived: (msg) => { });
         Assert.That(reconnected, Is.True, "New client should connect successfully");
 
@@ -546,7 +546,7 @@ public class CommsSocketsIntegrationTests
     public void ConnectionFailure_ServerUnavailable_HandlesGracefully()
     {
         const int unavailablePort = 9999; // Use a port that's unlikely to be in use
-        var client = new CommsClientSockets(IPAddress.Parse(_host), unavailablePort);
+        var client = new CommsClientSockets(new NetworkAddress(_host, unavailablePort));
 
         // Test synchronous connection failure
         Assert.Throws<SocketException>(() =>
@@ -573,7 +573,7 @@ public class CommsSocketsIntegrationTests
     {
         var broadcastReceived = new TaskCompletionSource<BroadcastMessage>();
         var commandCompleted = new TaskCompletionSource<CommandResponse>();
-        var client = new CommsClientSockets(IPAddress.Parse(_host), _basePort);
+        var client = new CommsClientSockets(new NetworkAddress(_host, _basePort));
 
         var connected = await client.ConnectAsync(onBroadcastReceived: (msg) =>
         {
@@ -639,7 +639,7 @@ public class CommsSocketsIntegrationTests
             // Perform many operations to detect potential memory leaks
             for (int i = 0; i < operationCount; i++)
             {
-                var client = new CommsClientSockets(IPAddress.Parse(_host), _basePort);
+                var client = new CommsClientSockets(new NetworkAddress(_host, _basePort));
                 clients.Add(client);
 
                 var task = Task.Run(async () =>

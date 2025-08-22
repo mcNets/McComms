@@ -17,7 +17,7 @@ public class SocketsIntegrationTests
     public async Task OneTimeSetup()
     {
         _serverCts = new CancellationTokenSource();
-        _server = new SocketsServer(IPAddress.Parse(_host), BasePort);
+        _server = new SocketsServer(new NetworkAddress(_host, BasePort));
         
         // Start the server with a message handler
         _ = Task.Run(async () => await _server.ListenAsync(
@@ -60,7 +60,7 @@ public class SocketsIntegrationTests
     [Order(1)]
     public void ClientServer_SingleClient_SendCommandReceivesResponse()
     {
-        var client = new SocketsClient(IPAddress.Parse(_host), BasePort);
+        var client = new SocketsClient(new NetworkAddress(_host, BasePort));
         var connected = client.Connect(onMessageReceived: (msg) => { });
 
         Assert.That(connected, Is.True, "Client failed to connect to server");
@@ -82,7 +82,7 @@ public class SocketsIntegrationTests
     [Order(2)]
     public async Task ClientServer_SingleClient_SendCommandAsyncReceivesResponse()
     {
-        var client = new SocketsClient(IPAddress.Parse(_host), BasePort);
+        var client = new SocketsClient(new NetworkAddress(_host, BasePort));
         var connected = await client.ConnectAsync(onMessageReceived: (msg) => { });
 
         Assert.That(connected, Is.True, "Client failed to connect to server");
@@ -104,8 +104,8 @@ public class SocketsIntegrationTests
     [Order(3)]
     public void ClientServer_MultipleClients_AllReceiveResponses()
     {
-        var client1 = new SocketsClient(IPAddress.Parse(_host), BasePort);
-        var client2 = new SocketsClient(IPAddress.Parse(_host), BasePort);
+        var client1 = new SocketsClient(new NetworkAddress(_host, BasePort));
+        var client2 = new SocketsClient(new NetworkAddress(_host, BasePort));
 
         var connected1 = client1.Connect((_) => { });
         var connected2 = client2.Connect((_) => { });
@@ -143,8 +143,8 @@ public class SocketsIntegrationTests
     [Order(4)]
     public async Task ClientServer_MultipleClientsAsync_AllReceiveResponses()
     {
-        var client1 = new SocketsClient(IPAddress.Parse(_host), BasePort);
-        var client2 = new SocketsClient(IPAddress.Parse(_host), BasePort);
+        var client1 = new SocketsClient(new NetworkAddress(_host, BasePort));
+        var client2 = new SocketsClient(new NetworkAddress(_host, BasePort));
 
         var connected1 = await client1.ConnectAsync((_) => { });
         var connected2 = await client2.ConnectAsync((_) => { });
@@ -184,8 +184,8 @@ public class SocketsIntegrationTests
         var client1ReceivedMessages = new ConcurrentBag<string>();
         var client2ReceivedMessages = new ConcurrentBag<string>();
 
-        var client1 = new SocketsClient(IPAddress.Parse(_host), BasePort);
-        var client2 = new SocketsClient(IPAddress.Parse(_host), BasePort);
+        var client1 = new SocketsClient(new NetworkAddress(_host, BasePort));
+        var client2 = new SocketsClient(new NetworkAddress(_host, BasePort));
 
         var connected1 = client1.Connect(msg => client1ReceivedMessages.Add(SocketsHelper.Decode(msg.ToArray())));
         var connected2 = client2.Connect(msg => client2ReceivedMessages.Add(SocketsHelper.Decode(msg.ToArray())));
@@ -231,7 +231,7 @@ public class SocketsIntegrationTests
     [Order(6)]
     public void ClientServer_Clients_ReceiveLongResponse()
     {
-        var client = new SocketsClient(IPAddress.Parse(_host), BasePort);
+        var client = new SocketsClient(new NetworkAddress(_host, BasePort));
 
         var connected = client.Connect((_) => { });
 

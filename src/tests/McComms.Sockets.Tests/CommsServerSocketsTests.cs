@@ -27,9 +27,10 @@ public class CommsServerSocketsTests
     [Order(2)]
     public void Constructor_WithCustomParameters_InitializesServer()
     {
-        var ipAddress = IPAddress.Parse("127.0.0.1");
+        var ipAddress = "127.0.0.1";
         var port = 8889;
-        var server = new CommsServerSockets(ipAddress, port);
+        var networkAddress = new NetworkAddress(ipAddress, port);
+        var server = new CommsServerSockets(networkAddress);
         Assert.Multiple(() =>
         {
             Assert.That(server, Is.Not.Null);
@@ -47,9 +48,9 @@ public class CommsServerSocketsTests
         var mockCallback = new Func<McComms.Core.CommandRequest, McComms.Core.CommandResponse>(r => new McComms.Core.CommandResponse(true, "Mock Id", "Mock response"));
 
         var host = "127.0.0.1";
-        var ipAddress = IPAddress.Parse(host);
         var port = 9002;
-        var server = new CommsServerSockets(ipAddress, port);
+        var address = new NetworkAddress(host, port);
+        var server = new CommsServerSockets(address);
         Assert.DoesNotThrow(() =>
         {
             server.Start(mockCallback, _serverCts.Token);
@@ -62,9 +63,9 @@ public class CommsServerSocketsTests
     public void Stop_WhenCalled_DoesNotThrowException()
     {
         var host = "127.0.0.1";
-        var ipAddress = IPAddress.Parse(host);
         var port = 9003;
-        var server = new CommsServerSockets(ipAddress, port);
+        var address = new NetworkAddress(host, port);
+        var server = new CommsServerSockets(address);
         Assert.DoesNotThrow(() => server.Stop());
     }
 }

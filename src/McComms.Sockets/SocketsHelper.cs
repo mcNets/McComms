@@ -58,10 +58,10 @@ public class SocketsHelper
     /// <returns>Byte array with framing</returns>
     private static byte[] Framed(byte[] buffer) {
         // Optimized: uses Span<byte> for better efficiency (if needed, but optimization is minimal here)
-        byte[] framed = new byte[buffer.Length + 2];
-        framed[0] = STX;
-        buffer.CopyTo(framed, 1);
-        framed[^1] = ETX;
-        return framed;
+        byte[] frame = new byte[buffer.Length + 2];
+        frame[0] = STX;
+        buffer.CopyTo(frame, 1);
+        frame[^1] = ETX;
+        return frame;
     }
 }

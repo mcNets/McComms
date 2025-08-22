@@ -23,8 +23,8 @@ public class SocketsClientTests
     {
         var host = "127.1.1.1";
         var port = 9000;
-        var ipAddress = IPAddress.Parse(host);
-        using var client = new SocketsClient(ipAddress, port);
+        var address = new NetworkAddress(host, port);
+        using var client = new SocketsClient(address);
 
         Assert.Multiple(() =>
         {
@@ -84,17 +84,17 @@ public class SocketsClientTests
     public void Constructor_InvalidIpAddress_ThrowsFormatException()
     {
         Assert.Throws<FormatException>(() => {
-            var ip = System.Net.IPAddress.Parse("invalid_ip");
-            var client = new SocketsClient(ip, 12345);
+            var address = new NetworkAddress("invalid_ip", 12345);
+            var client = new SocketsClient(address);
         });
     }
 
     [Test]
     public void Constructor_InvalidPort_ThrowsArgumentOutOfRangeException()
     {
-        var ip = System.Net.IPAddress.Loopback;
+        var address = new NetworkAddress("127.0.0.1", -1);
         Assert.Throws<ArgumentOutOfRangeException>(() => {
-            var client = new SocketsClient(ip, -1);
+            var client = new SocketsClient(address);
         });
     }
 

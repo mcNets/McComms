@@ -1,3 +1,4 @@
+
 namespace McComms.WebSockets;
 
 /// <summary>
@@ -13,6 +14,8 @@ public class CommsClientWebSockets : ICommsClient {
     /// Gets or sets the callback for broadcast messages received from the server.
     /// </summary>
     public Action<BroadcastMessage>? OnBroadcastReceived { get; set; }
+
+    public CommsAddress Address => throw new NotImplementedException();
 
     /// <summary>
     /// Initializes a new instance of the CommsClientWebSockets class with default server address and port.
@@ -130,5 +133,17 @@ public class CommsClientWebSockets : ICommsClient {
         }
         
         return Task.CompletedTask;
+    }
+
+    public Task<bool> ConnectAsync(Action<BroadcastMessage>? onBroadcastReceived, CancellationToken token = default) {
+        throw new NotImplementedException();
+    }
+
+    public Task DisconnectAsync() {
+        throw new NotImplementedException();
+    }
+
+    public Task<CommandResponse> SendCommandAsync(CommandRequest msg, CancellationToken token = default) {
+        throw new NotImplementedException();
     }
 }

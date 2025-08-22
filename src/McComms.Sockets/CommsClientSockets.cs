@@ -7,6 +7,8 @@
 public class CommsClientSockets : ICommsClient, IDisposable {
     private readonly SocketsClient _client;
 
+    public NetworkAddress Address => _client.Address;
+
     /// <summary>
     /// Initializes a new instance of the CommsClientSockets class with default host and port.
     /// </summary>
@@ -19,11 +21,9 @@ public class CommsClientSockets : ICommsClient, IDisposable {
     /// </summary>
     /// <param name="host">The IP address of the host to connect to.</param>
     /// <param name="port">The port number to use for the connection.</param>
-    public CommsClientSockets(IPAddress host, int port) {
-        _client = new SocketsClient(host, port);
+    public CommsClientSockets(NetworkAddress address) {
+        _client = new SocketsClient(address);
     }
-
-    public NetworkAddress Address => _client.Address;
 
     /// <summary>
     /// Gets or sets the callback action that is invoked when a broadcast message is received.
@@ -45,9 +45,9 @@ public class CommsClientSockets : ICommsClient, IDisposable {
     /// </summary>
     /// <param name="onBroadcastReceived">Callback invoked when a broadcast message is received.</param>
     /// <returns>A task that represents the asynchronous operation. The value of the TResult parameter is true if connection is successful, false otherwise.</returns>
-    public async Task<bool> ConnectAsync(Action<BroadcastMessage>? onBroadcastReceived) {
+    public async Task<bool> ConnectAsync(Action<BroadcastMessage>? onBroadcastReceived, CancellationToken token = default) {
         OnBroadcastReceived = onBroadcastReceived;
-        return await _client.ConnectAsync(BroadcastReceived);
+        return await _client.ConnectAsync(BroadcastReceived, token);
     }
 
     /// <summary>
@@ -62,6 +62,10 @@ public class CommsClientSockets : ICommsClient, IDisposable {
         OnBroadcastReceived = null;
         
         _client.Dispose();
+    }
+
+    public Task DisconnectAsync() {
+        throw new NotImplementedException();
     }
 
     /// <summary>

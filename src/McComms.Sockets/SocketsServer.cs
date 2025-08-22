@@ -21,12 +21,12 @@ public class SocketsServer : IDisposable {
     /// <summary>
     /// TCP listener socket for accepting incoming command client connections.
     /// </summary>
-    private readonly Socket _commandListener;
+    private readonly Socket? _commandListener;
 
     /// <summary>
     /// TCP listener socket for accepting incoming broadcast client connections (port + 1).
     /// </summary>
-    private readonly Socket _broadcastListener;
+    private readonly Socket?  _broadcastListener;
 
     /// <summary>
     /// Endpoint for the command TCP listener defining the IP address and port to listen on.
@@ -64,24 +64,18 @@ public class SocketsServer : IDisposable {
     private readonly int _pollDelayMs;
 
     // The communication host that defines the address and port for the server
-    private readonly NetworkAddress? _address;
+    private NetworkAddress _address = new(DEFAULT_HOST, DEFAULT_PORT);
 
     // Semaphore for message processing synchronization
     private readonly SemaphoreSlim _messageProcessingLock = new(1, 1);
 
-    /// <summary>
-    /// Initializes a new instance of the SocketsServer class with default settings.
-    /// Listens on any IP address and the default port.
-    /// </summary>
-    public SocketsServer() : this(IPAddress.Parse(DEFAULT_HOST), DEFAULT_PORT, DEFAULT_POLL_DELAY_MS) {
-    }
+    public NetworkAddress Address => _address;
 
     /// <summary>
-    /// Initializes a new instance of the SocketsServer class with the specified IP address and port.
+    /// Initializes a new instance of the SocketsServer class with the specified NetworkAddress
     /// </summary>
-    /// <param name="ipAddress">The IP address to listen on.</param>
-    /// <param name="port">The port number to use.</param>
-    public SocketsServer(IPAddress ipAddress, int port) : this(ipAddress, port, DEFAULT_POLL_DELAY_MS) {
+    /// <param name="address">The NetworkAddress to listen on.</param>
+    public SocketsServer() : this(new NetworkAddress(DEFAULT_HOST, DEFAULT_PORT)) {
     }
 
     /// <summary>
@@ -90,71 +84,24 @@ public class SocketsServer : IDisposable {
     /// <param name="ipAddress">The IP address to listen on.</param>
     /// <param name="port">The port number to use for commands (broadcast will use port + 1).</param>
     /// <param name="pollDelayMs">The delay in milliseconds between polls when no data is available.</param>
-    public SocketsServer(IPAddress ipAddress, int port, int pollDelayMs) {
-        _address = new CommsHost(ipAddress.ToString(), port);
-        _commandEndPoint = new IPEndPoint(ipAddress, port);
-        _broadcastEndPoint = new IPEndPoint(ipAddress, port + 1);
+    public SocketsServer(NetworkAddress address, int pollDelayMs = DEFAULT_POLL_DELAY_MS) {
+        _address = address;
+        _commandEndPoint = new IPEndPoint(IPAddress.Parse(address.Host), address.Port);
+        _broadcastEndPoint = new IPEndPoint(IPAddress.Parse(address.Host), address.Port + 1);
         _commandListener = new Socket(_commandEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
         _broadcastListener = new Socket(_broadcastEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
         _pollDelayMs = pollDelayMs > 0 ? pollDelayMs : DEFAULT_POLL_DELAY_MS;
     }
 
-    public NetworkAddress Address => _address ?? throw new InvalidOperationException("CommsHost is not initialized.");
-
     /// <summary>
-    /// Removes a specific disconnected command client from the collection immediately.
+    /// Starts listening for incoming client connections and processes their messages.
     /// </summary>
-    /// <param name="clientToRemove">The client to remove and dispose.</param>
-    private async Task RemoveCommandClientAsync(SocketsClientModel clientToRemove) {
-        await _messageProcessingLock.WaitAsync();
-        try {
-            // Create new collection without the disconnected client
-            var remainingClients = _commandClients.Where(c => c != clientToRemove && c.Connected).ToArray();
-            _commandClients.Clear();
-            foreach (var client in remainingClients) {
-                _commandClients.Add(client);
-            }
-
-            // Dispose the removed client
-            try {
-                clientToRemove.Dispose();
-                Debug.WriteLine($"Command client {clientToRemove.Id} removed and disposed, remaining clients: {_commandClients.Count}");
-            }
-            catch (Exception ex) {
-                Debug.WriteLine($"Error disposing removed command client {clientToRemove.Id}: {ex.Message}");
-            }
-        }
-        finally {
-            _messageProcessingLock.Release();
-        }
-    }
-
-    /// <summary>
-    /// Removes a specific disconnected broadcast client from the collection immediately.
-    /// </summary>
-    /// <param name="clientToRemove">The client to remove and dispose.</param>
-    private async Task RemoveBroadcastClientAsync(SocketsClientModel clientToRemove) {
-        await _messageProcessingLock.WaitAsync();
-        try {
-            // Create new collection without the disconnected client
-            var remainingClients = _broadcastClients.Where(c => c != clientToRemove && c.Connected).ToArray();
-            _broadcastClients.Clear();
-            foreach (var client in remainingClients) {
-                _broadcastClients.Add(client);
-            }
-
-            // Dispose the removed client
-            try {
-                clientToRemove.Dispose();
-                Debug.WriteLine($"Broadcast client {clientToRemove.Id} removed and disposed, remaining clients: {_broadcastClients.Count}");
-            }
-            catch (Exception ex) {
-                Debug.WriteLine($"Error disposing removed broadcast client {clientToRemove.Id}: {ex.Message}");
-            }
-        }
-        finally {
-            _messageProcessingLock.Release();
-        }
+    /// <param name="onMessageReceived">Callback function invoked when a message is received from a client.</param>
+    /// <param name="stopToken">A cancellation token that can be used to stop the server.</param>
+    public void Listen(Func<byte[], byte[]> onMessageReceived, CancellationToken stopToken) {
+        // Call the async version and block until it completes
+        // This maintains backward compatibility
+        _ = Task.Run(async () => await ListenAsync(onMessageReceived, stopToken), stopToken);
     }
 
     /// <summary>
@@ -166,6 +113,10 @@ public class SocketsServer : IDisposable {
     /// <returns>A Task representing the asynchronous operation.</returns>
     public async Task ListenAsync(Func<byte[], byte[]> onMessageReceived, CancellationToken stopToken) {
         _onMessageReceived = onMessageReceived;
+
+        if (_commandListener == null || _broadcastListener == null || _commandEndPoint == null || _broadcastEndPoint == null) {
+            throw new InvalidOperationException("Server not properly initialized.");
+        }
 
         // Start listening on both ports
         _commandListener.Bind(_commandEndPoint!);
@@ -191,6 +142,10 @@ public class SocketsServer : IDisposable {
     /// Accepts incoming command client connections.
     /// </summary>
     private async Task AcceptCommandClientsAsync(CancellationToken stopToken) {
+        if (_commandListener == null) {
+            throw new InvalidOperationException("Command listener not initialized.");
+        }
+        
         while (!stopToken.IsCancellationRequested) {
             try {
                 Socket client = await _commandListener.AcceptAsync(stopToken);
@@ -217,6 +172,10 @@ public class SocketsServer : IDisposable {
     /// Accepts incoming broadcast client connections.
     /// </summary>
     private async Task AcceptBroadcastClientsAsync(CancellationToken stopToken) {
+        if (_broadcastListener == null) {
+            throw new InvalidOperationException("Broadcast listener not initialized.");
+        }
+        
         while (!stopToken.IsCancellationRequested) {
             try {
                 Socket client = await _broadcastListener.AcceptAsync(stopToken);
@@ -240,23 +199,13 @@ public class SocketsServer : IDisposable {
     }
 
     /// <summary>
-    /// Starts listening for incoming client connections and processes their messages.
-    /// </summary>
-    /// <param name="onMessageReceived">Callback function invoked when a message is received from a client.</param>
-    /// <param name="stopToken">A cancellation token that can be used to stop the server.</param>
-    public void Listen(Func<byte[], byte[]> onMessageReceived, CancellationToken stopToken) {
-        // Call the async version and block until it completes
-        // This maintains backward compatibility
-        _ = Task.Run(async () => await ListenAsync(onMessageReceived, stopToken), stopToken);
-    }
-
-    /// <summary>
     /// Sends a broadcast message to all connected broadcast clients asynchronously.
     /// </summary>
     /// <param name="command">The message to broadcast as a byte array.</param>
+    /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
     /// <returns>A Task representing the asynchronous operation.</returns>
-    public async ValueTask SendBroadcastAsync(byte[] command) {
-        await _messageProcessingLock.WaitAsync();
+    public async ValueTask SendBroadcastAsync(byte[] command, CancellationToken cancellationToken = default) {
+        await _messageProcessingLock.WaitAsync(cancellationToken);
         try {
             int disconnectedCount = 0;
             var clientsToRemove = new List<SocketsClientModel>();
@@ -264,7 +213,7 @@ public class SocketsServer : IDisposable {
             foreach (var client in _broadcastClients) {
                 try {
                     if (client.Connected) {
-                        await client.Stream.WriteAsync(command);
+                        await client.Stream.WriteAsync(command, cancellationToken);
                     }
                     else {
                         clientsToRemove.Add(client);
@@ -388,8 +337,36 @@ public class SocketsServer : IDisposable {
             ArrayPool<byte>.Shared.Return(buffer);
             
             // Immediately remove and dispose this client from the collection
-            _ = Task.Run(async () => await RemoveCommandClientAsync(client));
+            _ = Task.Run(async () => await RemoveClientAsync(client));
             Debug.WriteLine($"Command client {client.Id} disconnected and scheduled for removal");
+        }
+    }
+
+    /// <summary>
+    /// Removes a specific disconnected client from the collection immediately.
+    /// </summary>
+    /// <param name="clientToRemove">The client to remove and dispose.</param>
+    private async Task RemoveClientAsync(SocketsClientModel clientToRemove) {
+        await _messageProcessingLock.WaitAsync();
+        try {
+            // Create new collection without the disconnected client
+            var remainingClients = _commandClients.Where(c => c != clientToRemove && c.Connected).ToArray();
+            _commandClients.Clear();
+            foreach (var client in remainingClients) {
+                _commandClients.Add(client);
+            }
+
+            // Dispose the removed client
+            try {
+                clientToRemove.Dispose();
+                Debug.WriteLine($"Command client {clientToRemove.Id} removed and disposed, remaining clients: {_commandClients.Count}");
+            }
+            catch (Exception ex) {
+                Debug.WriteLine($"Error disposing removed command client {clientToRemove.Id}: {ex.Message}");
+            }
+        }
+        finally {
+            _messageProcessingLock.Release();
         }
     }
 
@@ -410,7 +387,7 @@ public class SocketsServer : IDisposable {
             // Close both TCP listener sockets
             if (_commandListener != null) {
                 try {
-                    _commandListener.Close();
+                    _commandListener?.Close();
                 }
                 catch (Exception ex) {
                     Debug.WriteLine($"Error during command listener close: {ex.Message}");
@@ -456,5 +433,33 @@ public class SocketsServer : IDisposable {
             _messageProcessingLock?.Dispose();
         }
     }
+
+    /// <summary>
+    /// Removes a specific disconnected broadcast client from the collection immediately.
+    /// </summary>
+    /// <param name="clientToRemove">The client to remove and dispose.</param>
+    // private async Task RemoveBroadcastClientAsync(SocketsClientModel clientToRemove) {
+    //     await _messageProcessingLock.WaitAsync();
+    //     try {
+    //         // Create new collection without the disconnected client
+    //         var remainingClients = _broadcastClients.Where(c => c != clientToRemove && c.Connected).ToArray();
+    //         _broadcastClients.Clear();
+    //         foreach (var client in remainingClients) {
+    //             _broadcastClients.Add(client);
+    //         }
+
+    //         // Dispose the removed client
+    //         try {
+    //             clientToRemove.Dispose();
+    //             Debug.WriteLine($"Broadcast client {clientToRemove.Id} removed and disposed, remaining clients: {_broadcastClients.Count}");
+    //         }
+    //         catch (Exception ex) {
+    //             Debug.WriteLine($"Error disposing removed broadcast client {clientToRemove.Id}: {ex.Message}");
+    //         }
+    //     }
+    //     finally {
+    //         _messageProcessingLock.Release();
+    //     }
+    // }
 }
 

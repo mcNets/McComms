@@ -21,11 +21,12 @@ public class CommsClientSocketsTests
     public void Constructor_WithCustomParameters_InitializesClient()
     {
         // Arrange
-        var ipAddress = IPAddress.Parse("127.0.0.1");
+        var ipAddress = "127.0.0.1";
         var port = 8888;
+        var address = new NetworkAddress(ipAddress, port);
 
         // Act
-        var client = new CommsClientSockets(ipAddress, port);
+        var client = new CommsClientSockets(address);
 
         // Assert
         Assert.That(client, Is.Not.Null);

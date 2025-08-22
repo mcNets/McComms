@@ -29,6 +29,8 @@ public class CommsServerWebSockets : ICommsServer {
     /// </summary>
     public Func<CommandRequest, CommandResponse>? CommandReceived { get; set; }
 
+    public CommsAddress Address => throw new NotImplementedException();
+
     /// <summary>
     /// Starts the server and begins listening for incoming connections and commands.
     /// </summary>
@@ -89,5 +91,13 @@ public class CommsServerWebSockets : ICommsServer {
             Console.WriteLine($"Error processing command: {ex.Message}");
             return Encoding.UTF8.GetBytes($"R:{{\"Success\":false,\"Id\":\"\",\"Message\":\"Error processing command: {ex.Message}\"}}");
         }
+    }
+
+    public Task StopAsync() {
+        throw new NotImplementedException();
+    }
+
+    public Task SendBroadcastAsync(BroadcastMessage msg) {
+        throw new NotImplementedException();
     }
 }

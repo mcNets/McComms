@@ -26,14 +26,15 @@ public class SocketsServerTests
     [Order(2)]
     public void Constructor_WithCustomParameters_InitializesServerWithCustomValues()
     {
-        var ipAddress = IPAddress.Parse("127.1.1.1");
+        var host = "127.1.1.1";
         var port = 9001;
-        var server = new SocketsServer(ipAddress, port);
+        var address = new NetworkAddress(host, port);
+        var server = new SocketsServer(address);
         Assert.Multiple(() =>
         {
             Assert.That(server, Is.Not.Null);
-            Assert.That(server.Address.Host, Is.EqualTo(ipAddress.ToString()));
-            Assert.That(server.Address.Port, Is.EqualTo(port));
+            Assert.That(server.Address.Host, Is.EqualTo(address.Host));
+            Assert.That(server.Address.Port, Is.EqualTo(address.Port));
         });
         server.Dispose();
     }
@@ -51,9 +52,10 @@ public class SocketsServerTests
     public void Listen_WhenCalled_DoesNotThrowException()
     {
         // Arrange
-        var host = IPAddress.Parse("127.0.0.1");
+        var host = "127.0.0.1";
         var port = 9002;
-        var server = new SocketsServer(host, port);
+        var address = new NetworkAddress(host, port);
+        var server = new SocketsServer(address);
         var cancellationToken = CancellationToken.None;
 
         Assert.DoesNotThrow(() =>
