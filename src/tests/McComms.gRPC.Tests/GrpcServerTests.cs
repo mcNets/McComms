@@ -41,8 +41,8 @@ public class GrpcServerTests {
     public void Constructor_WithCustomParameters_InitializesServerWithCustomValues() {
         var host = "127.0.0.1";
         var port = 9001;
-        var commsHost = new CommsAddress(host, port);
-        var server = new GrpcServer(commsHost, _serverCredentials);
+        var address = new NetworkAddress(host, port);
+        var server = new GrpcServer(address, _serverCredentials);
         Assert.Multiple(() => {
             Assert.That(server, Is.Not.Null);
             Assert.That(server.Address.Host, Is.EqualTo(host));
@@ -57,8 +57,8 @@ public class GrpcServerTests {
         // Arrange
         var host = "127.0.0.1";
         var port = 9002;
-        var commsHost = new CommsAddress(host, port);
-        var server = new GrpcServer(commsHost, _serverCredentials);
+        var address = new NetworkAddress(host, port);
+        var server = new GrpcServer(address, _serverCredentials);
         var mockCallback = new Func<Commsproto.mcCommandRequest, Commsproto.mcCommandResponse>(r => new Commsproto.mcCommandResponse());
 
         Assert.DoesNotThrow(() => {
@@ -72,8 +72,8 @@ public class GrpcServerTests {
     public void Stop_WhenCalled_DoesNotThrowException() {
         var host = "127.0.0.1";
         var port = 9003;
-        var commsHost = new CommsAddress(host, port);
-        var server = new GrpcServer(commsHost, _serverCredentials);
+        var address = new NetworkAddress(host, port);
+        var server = new GrpcServer(address, _serverCredentials);
         Assert.DoesNotThrow(() => server.Stop());
     }
 
@@ -82,8 +82,8 @@ public class GrpcServerTests {
     public void SendBroadcast_ThrowException_WhenServerIsNotRunning() {
         var host = "127.0.0.1";
         var port = 9004;
-        var commsHost = new CommsAddress(host, port);
-        var server = new GrpcServer(commsHost, _serverCredentials);
+        var address = new NetworkAddress(host, port);
+        var server = new GrpcServer(address, _serverCredentials);
         Assert.Throws<InvalidOperationException>(() => server.SendBroadcast(new Commsproto.mcBroadcast()));
         server.Stop();
     }
@@ -93,8 +93,8 @@ public class GrpcServerTests {
     public void SendBroadcastAsync_ThrowException_WhenServerIsNotRunning() {
         var host = "127.0.0.1";
         var port = 9004;
-        var commsHost = new CommsAddress(host, port);
-        var server = new GrpcServer(commsHost, _serverCredentials);
+        var address = new NetworkAddress(host, port);
+        var server = new GrpcServer(address, _serverCredentials);
         Assert.ThrowsAsync<InvalidOperationException>(async () => await server.SendBroadcastAsync(new Commsproto.mcBroadcast()));
         server.Stop();
     }
@@ -104,8 +104,8 @@ public class GrpcServerTests {
     public void Start_WhenCalledMultipleTimes_DoesNotThrowException() {
         var host = "127.0.0.1";
         var port = 9007;
-        var commsHost = new CommsAddress(host, port);
-        var server = new GrpcServer(commsHost, _serverCredentials);
+        var address = new NetworkAddress(host, port);
+        var server = new GrpcServer(address, _serverCredentials);
         var mockCallback = new Func<Commsproto.mcCommandRequest, Commsproto.mcCommandResponse>(r => new Commsproto.mcCommandResponse());
 
         Assert.DoesNotThrow(() => {
@@ -120,8 +120,8 @@ public class GrpcServerTests {
     public void Stop_WhenCalledMultipleTimes_DoesNotThrowException() {
         var host = "127.0.0.1";
         var port = 9008;
-        var commsHost = new CommsAddress(host, port);
-        var server = new GrpcServer(commsHost, _serverCredentials);
+        var address = new NetworkAddress(host, port);
+        var server = new GrpcServer(address, _serverCredentials);
 
         Assert.DoesNotThrow(() => {
             server.Stop();

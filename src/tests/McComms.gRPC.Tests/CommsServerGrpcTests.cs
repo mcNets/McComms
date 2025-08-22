@@ -42,13 +42,13 @@ public class CommsServerGrpcTests
     [Order(2)]
     public void Constructor_WithCustomParameters_InitializesServerWithCustomValues()
     {
-        var commsHost = new CommsAddress("127.0.0.1", 9001);
-        var server = new CommsServerGrpc(commsHost);
+        var address = new NetworkAddress("127.0.0.1", 9001);
+        var server = new CommsServerGrpc(address);
         Assert.Multiple(() =>
         {
             Assert.That(server, Is.Not.Null);
-            Assert.That(server.Address.Host, Is.EqualTo(commsHost.Host));
-            Assert.That(server.Address.Port, Is.EqualTo(commsHost.Port));
+            Assert.That(server.Address.Host, Is.EqualTo(address.Host));
+            Assert.That(server.Address.Port, Is.EqualTo(address.Port));
         });
         server.Stop();
     }
@@ -60,8 +60,8 @@ public class CommsServerGrpcTests
         // Arrange
         var mockCallback = new Func<McComms.Core.CommandRequest, McComms.Core.CommandResponse>(r => new McComms.Core.CommandResponse(true, "Mock Id", "Mock response"));
 
-        var commsHost = new CommsAddress("127.0.0.1", 9002);
-        var server = new CommsServerGrpc(commsHost);
+        var address = new NetworkAddress("127.0.0.1", 9002);
+        var server = new CommsServerGrpc(address);
         Assert.DoesNotThrow(() =>
         {
             server.Start(mockCallback, _serverCts.Token);
@@ -73,8 +73,8 @@ public class CommsServerGrpcTests
     [Order(4)]
     public void Stop_WhenCalled_DoesNotThrowException()
     {
-        var commsHost = new CommsAddress("127.0.0.1", 9003);
-        var server = new CommsServerGrpc(commsHost);
+        var address = new NetworkAddress("127.0.0.1", 9003);
+        var server = new CommsServerGrpc(address);
         Assert.DoesNotThrow(() => server.Stop());
     }
     
@@ -82,8 +82,8 @@ public class CommsServerGrpcTests
     [Order(5)]
     public void SendBroadcast_WithoutCallingStart_ThrowsException()
     {
-        var commsHost = new CommsAddress("127.0.0.1", 9004);
-        var server = new CommsServerGrpc(commsHost);
+        var address = new NetworkAddress("127.0.0.1", 9004);
+        var server = new CommsServerGrpc(address);
         Assert.Throws<InvalidOperationException>(() => server.SendBroadcast(new McComms.Core.BroadcastMessage(1, "Test message")));
         server.Stop();
     }    
@@ -92,8 +92,8 @@ public class CommsServerGrpcTests
     [Order(6)]
     public void SendBroadcastAsync_WithoutCallingStart_ThrowsException()
     {
-        var commsHost = new CommsAddress("127.0.0.1", 9004);
-        var server = new CommsServerGrpc(commsHost);
+        var address = new NetworkAddress("127.0.0.1", 9004);
+        var server = new CommsServerGrpc(address);
         Assert.ThrowsAsync<InvalidOperationException>(async () => await server.SendBroadcastAsync(new McComms.Core.BroadcastMessage(1, "Test message")));
         server.Stop();
     }

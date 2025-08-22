@@ -11,7 +11,7 @@ public class CommsClientGrpc : ICommsClient
     /// <summary>
     /// Gets the NetworkAddress object that contains the host and port information
     /// </summary>
-    public NetworkAddress Address => _client.Address;
+    public NetworkAddress Address => _client.Address; 
     
     /// <summary>
     /// Default constructor that initializes the client with default settings

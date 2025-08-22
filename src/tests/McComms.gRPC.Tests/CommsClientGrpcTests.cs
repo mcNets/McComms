@@ -14,8 +14,8 @@ public class CommsClientGrpcTests
         Assert.Multiple(() =>
         {
             Assert.That(client, Is.Not.Null);
-            Assert.That(client.Host.Host, Is.EqualTo(GrpcClient.DEFAULT_HOST));
-            Assert.That(client.Host.Port, Is.EqualTo(GrpcClient.DEFAULT_PORT));
+            Assert.That(client.Address.Host, Is.EqualTo(GrpcClient.DEFAULT_HOST));
+            Assert.That(client.Address.Port, Is.EqualTo(GrpcClient.DEFAULT_PORT));
         });
     }
 
@@ -24,13 +24,13 @@ public class CommsClientGrpcTests
     {
         var host = "localhost";
         var port = 50051;
-        var commsHost = new CommsAddress(host, port);
-        var client = new CommsClientGrpc(commsHost);
+        var address = new NetworkAddress(host, port);
+        var client = new CommsClientGrpc(address);
         Assert.Multiple(() =>
         {
             Assert.That(client, Is.Not.Null);
-            Assert.That(client.Host.Host, Is.EqualTo(host));
-            Assert.That(client.Host.Port, Is.EqualTo(port));
+            Assert.That(client.Address.Host, Is.EqualTo(host));
+            Assert.That(client.Address.Port, Is.EqualTo(port));
         });
     }
 

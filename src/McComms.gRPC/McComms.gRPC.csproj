@@ -43,6 +43,6 @@
 		<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="McComms.Core" Version="1.0.8" />
+		<PackageReference Include="McComms.Core" Version="1.1.0" />
 	</ItemGroup>
 </Project>
