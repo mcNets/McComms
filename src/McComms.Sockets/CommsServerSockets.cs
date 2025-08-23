@@ -13,6 +13,11 @@ public class CommsServerSockets : ICommsServer {
     public NetworkAddress Address => _socketServer.Address;
 
     /// <summary>
+    /// Gets the communication protocol used by this server.
+    /// </summary>
+    public CommsProtocol Protocol => CommsProtocol.Sockets;
+
+    /// <summary>
     /// Callback function that is invoked when a command is received.
     /// </summary>
     public Func<CommandRequest, CommandResponse>? CommandReceived { get; set; }
@@ -39,7 +44,8 @@ public class CommsServerSockets : ICommsServer {
     /// <param name="stopToken">A cancellation token that can be used to stop the server.</param>
     public void Start(Func<CommandRequest, CommandResponse>? commandReceived, CancellationToken stopToken) {
         CommandReceived = commandReceived;
-        _ = Task.Run(async () => await _socketServer.ListenAsync(OnCommandReceived, stopToken), stopToken);
+        _socketServer.Listen(OnCommandReceived, stopToken);
+        //_ = Task.Run(async () => await _socketServer.ListenAsync(OnCommandReceived, stopToken), stopToken);
     }
 
     /// <summary>

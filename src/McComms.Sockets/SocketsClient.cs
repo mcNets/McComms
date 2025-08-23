@@ -4,22 +4,15 @@ namespace McComms.Sockets;
 
 /// <summary>
 /// SocketsClient provides a TCP client for sending and receiving framed messages asynchronously.
-/// Uses two separate connections: one for commands/responses and another for broadcast messages.
+/// Uses two separate connections: one for commands/responses and another for broadcast messages. (port +1)
 /// This eliminates race conditions between command responses and broadcast messages.
 /// </summary>
 public class SocketsClient : IDisposable {
     // Constants
     public const string DEFAULT_HOST = "127.0.0.1";
-
     public const int DEFAULT_PORT = 50051;
-
-    // Maximum buffer size for reading messages
     private const int MAX_BUFFER_SIZE = 1500;
-
-    // Default poll delay in milliseconds to avoid busy waiting
     private const int DEFAULT_POLL_DELAY_MS = 5;
-
-    // Default timeout for reading messages in milliseconds
     private const int DEFAULT_READ_TIMEOUT_MS = 10000;
 
     // Timeout for reading messages in milliseconds
@@ -44,19 +37,18 @@ public class SocketsClient : IDisposable {
     // CommsHost object for host and port information
     private readonly NetworkAddress _address = new(DEFAULT_HOST, DEFAULT_PORT);
 
-    /// <summary>
-    /// Callback invoked when a message is received from the server.
-    /// </summary>
-    public Action<ReadOnlySpan<byte>>? OnMessageReceived { get; set; }
-
     // Task and cancellation for async background message listening
     private Task? _broadcastTask;
     private readonly CancellationTokenSource _broadcastCts = new();
     private readonly List<byte> _broadcastMsgBuffer = new(MAX_BUFFER_SIZE);
+
+    /// <summary>
+    /// Callback invoked when a message is received from the server.
+    /// </summary>
+    public Action<ReadOnlySpan<byte>>? OnMessageReceived { get; set; }
     
     /// <summary>
-    /// Buffer for storing the response message when sending synchronously and asynchronously.
-    /// Using a single buffer for both operations since they are synchronized by semaphore.
+    /// Buffer for storing the response message.
     /// </summary>
     private readonly List<byte> _responseBuffer = new(MAX_BUFFER_SIZE);
 
@@ -96,34 +88,29 @@ public class SocketsClient : IDisposable {
     /// Connects to a server and starts background message listening (synchronous version).
     /// </summary>
     public bool Connect(Action<ReadOnlySpan<byte>> onMessageReceived) {
-        // Set the callback for received messages
         OnMessageReceived = onMessageReceived;
 
         try {
-            // Connect to the command server endpoint
             _commandSocket.Connect(_commandEndPoint);
             if (_commandSocket.Connected == false) {
                 throw new Exception("Cannot connect to the command server.");
             }
 
-            // Connect to the broadcast server endpoint (port + 1)
             _broadcastSocket.Connect(_broadcastEndPoint);
             if (_broadcastSocket.Connected == false) {
                 throw new Exception("Cannot connect to the broadcast server.");
             }
 
-            // Create the network streams for communication
             _commandStream = new NetworkStream(_commandSocket);
             _broadcastStream = new NetworkStream(_broadcastSocket);
 
-            // Start the async broadcast message listener in a separate thread
             _broadcastTask = Task.Run(async () => await WaitBroadcastMessageAsync());
 
             return true;
         }
         catch (Exception ex) {
             System.Diagnostics.Debug.WriteLine($"McComms.Socket ERROR connecting: {ex.Message}");
-            throw;
+            return false;
         }
     }
 
@@ -134,34 +121,29 @@ public class SocketsClient : IDisposable {
     /// <param name="cancellationToken">Cancellation token to cancel the connection operation</param>
     /// <returns>True if connected</returns>
     public async Task<bool> ConnectAsync(Action<ReadOnlySpan<byte>> onMessageReceived, CancellationToken cancellationToken = default) {
-        // Set the callback for received messages
         OnMessageReceived = onMessageReceived;
 
         try {
-            // Connect to the command server endpoint
             await _commandSocket.ConnectAsync(_commandEndPoint, cancellationToken);
             if (_commandSocket.Connected == false) {
                 throw new Exception("Cannot connect to the command server.");
             }
 
-            // Connect to the broadcast server endpoint (port + 1)
             await _broadcastSocket.ConnectAsync(_broadcastEndPoint, cancellationToken);
             if (_broadcastSocket.Connected == false) {
                 throw new Exception("Cannot connect to the broadcast server.");
             }
 
-            // Create the network streams for communication
             _commandStream = new NetworkStream(_commandSocket);
             _broadcastStream = new NetworkStream(_broadcastSocket);
 
-            // Start the async broadcast message listener in a separate thread
             _broadcastTask = Task.Run(async () => await WaitBroadcastMessageAsync());
 
             return true;
         }
         catch (Exception ex) {
             System.Diagnostics.Debug.WriteLine($"McComms.Socket ERROR connecting: {ex.Message}");
-            throw;
+            return false;
         }
     }
 
@@ -191,7 +173,6 @@ public class SocketsClient : IDisposable {
         try {
             // Acquire send semaphore to prevent concurrent sends
             _sendSemaphore.Wait();
-            bool hasResponse = false;
 
             // Send the message on the command stream
             _commandStream.Write(message);
@@ -207,6 +188,7 @@ public class SocketsClient : IDisposable {
                 var startTime = Environment.TickCount64;
                 var timeoutMs = _readTimeoutMs;
 
+                bool hasResponse = false;
                 while (!hasResponse) {
                     // Check for timeout
                     if (Environment.TickCount64 - startTime > timeoutMs) {
@@ -215,9 +197,7 @@ public class SocketsClient : IDisposable {
                     
                     var bytesRead = _commandStream.Read(buffer, 0, buffer.Length);
                     if (bytesRead == 0) {
-                        // Small delay to avoid busy waiting when no data is available
-                        Thread.Sleep(1);
-                        continue;
+                        throw new InvalidOperationException("Connection closed unexpectedly");
                     }
 
                     for (int x = 0; x < bytesRead; x++) {
@@ -293,6 +273,7 @@ public class SocketsClient : IDisposable {
         using var timeOutCts = new CancellationTokenSource(_readTimeoutMs);
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(timeOutCts.Token, cancellationToken);
         var combinedToken = linkedCts.Token;
+
         try {
             // Acquire send semaphore
             await _sendSemaphore.WaitAsync(combinedToken);
@@ -309,6 +290,7 @@ public class SocketsClient : IDisposable {
                 int posBuffer = -1;
                 bool foundSTX = false;
                 _responseBuffer.Clear();
+
                 while (!hasResponse && !combinedToken.IsCancellationRequested) {
                     var bytesRead = await _commandStream.ReadAsync(buffer, combinedToken);
                     if (bytesRead == 0) {
@@ -465,14 +447,14 @@ public class SocketsClient : IDisposable {
             }
 
             // Disconnect and close both sockets if connected
-            if (_commandSocket is not null && _commandSocket.Connected) {
-                _commandSocket?.Disconnect(false);
-                _commandSocket?.Close();
+            if (_commandSocket?.Connected == true) {
+                _commandSocket.Disconnect(false);
+                _commandSocket.Close();
             }
 
-            if (_broadcastSocket is not null && _broadcastSocket.Connected) {
-                _broadcastSocket?.Disconnect(false);
-                _broadcastSocket?.Close();
+            if (_broadcastSocket?.Connected == true) {
+                _broadcastSocket.Disconnect(false);
+                _broadcastSocket.Close();
             }
             
             // Clear event handlers to prevent memory leaks
@@ -489,16 +471,15 @@ public class SocketsClient : IDisposable {
     public async Task DisconnectAsync() {
         try {
             // Signal the async broadcast task to cancel and exit
-            if (_broadcastCts is not null) {
-                await _broadcastCts.CancelAsync();
-            }
+            _broadcastCts?.Cancel();
 
             // Wait for the broadcast task to finish with a reasonable timeout
             if (_broadcastTask is not null && !_broadcastTask.IsCompleted) {
                 try {
-                    _broadcastTask.Wait(TimeSpan.FromSeconds(1));
+                    using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+                    await _broadcastTask.WaitAsync(timeoutCts.Token);
                 }
-                catch (OperationCanceledException) { /* Expected during cancellation */
+                catch (OperationCanceledException) { /* Expected during cancellation or timeout */
                 }
                 catch (Exception ex) {
                     System.Diagnostics.Debug.WriteLine($"Error waiting for broadcast task: {ex.Message}");
@@ -506,14 +487,14 @@ public class SocketsClient : IDisposable {
             }
 
             // Disconnect and close both sockets if connected
-            if (_commandSocket is not null && _commandSocket.Connected) {
+            if (_commandSocket?.Connected == true) {
                 _commandSocket.Disconnect(false);
-                _commandSocket?.Close();
+                _commandSocket.Close();
             }
 
-            if (_broadcastSocket is not null && _broadcastSocket.Connected) {
+            if (_broadcastSocket?.Connected == true) {
                 _broadcastSocket.Disconnect(false);
-                _broadcastSocket?.Close();
+                _broadcastSocket.Close();
             }
             
             // Clear event handlers to prevent memory leaks

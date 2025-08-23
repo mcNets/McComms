@@ -5,7 +5,7 @@ namespace McComms.Sockets.Tests;
 public class SocketsIntegrationTests
 {
     // Base port number - each test will use BasePort + test order
-    private const int BasePort = 8000;
+    private const int BasePort = 50051;
     private int GetTestPort(int testOrder) => BasePort + testOrder;
 
     private readonly string _host = "127.0.0.1";
@@ -14,7 +14,7 @@ public class SocketsIntegrationTests
     private SocketsServer _server = null!;
 
     [OneTimeSetUp]
-    public async Task OneTimeSetup()
+    public async Task OneTimeSetUp()
     {
         _serverCts = new CancellationTokenSource();
         _server = new SocketsServer(new NetworkAddress(_host, BasePort));

@@ -42,7 +42,7 @@ jobs:
         run: dotnet build src/McComms.Core/McComms.Core.csproj --configuration Release
 
       - name: Test McComms.Core
-        run: dotnet test src/tests/McComms.Core.Tests/McComms.Core.Tests.csproj --no-build --configuration Release
+        run: dotnet test src/tests/McComms.Core.Tests/McComms.Core.Tests.csproj --configuration Release
 
       - name: Pack McComms.Core
         run: dotnet pack src/McComms.Core/McComms.Core.csproj -o ./src/Packages --configuration Release
@@ -66,6 +66,23 @@ jobs:
 
       - name: Push McComms.gRPC to NuGet
         run: dotnet nuget push src/Packages/McComms.gRPC.*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      # McComms.Sockets
+      # -------------------------------------------------------------------------------------------------------------
+      - name: Restore McComms.Sockets
+        run: dotnet restore src/McComms.Sockets/McComms.Sockets.csproj
+
+      - name: Build McComms.Sockets
+        run: dotnet build src/McComms.Sockets/McComms.Sockets.csproj --configuration Release
+
+      - name: Test McComms.Sockets
+        run: dotnet test src/tests/McComms.Sockets.Tests/McComms.Sockets.Tests.csproj --configuration Release
+
+      - name: Pack McComms.Sockets
+        run: dotnet pack src/McComms.Sockets/McComms.Sockets.csproj -o ./src/Packages --configuration Release
+
+      - name: Push McComms.Sockets to NuGet
+        run: dotnet nuget push src/Packages/McComms.Sockets.*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
 
       # McComms.gRPC, McComms.Sockets, McComms.WebSockets
       # -------------------------------------------------------------------------------------------------------------

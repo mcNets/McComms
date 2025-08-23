@@ -543,22 +543,16 @@ public class CommsSocketsIntegrationTests
 
     [Test]
     [Order(13)]
-    public void ConnectionFailure_ServerUnavailable_HandlesGracefully()
+    public async Task ConnectionFailure_ServerUnavailable_HandlesGracefully()
     {
         const int unavailablePort = 9999; // Use a port that's unlikely to be in use
         var client = new CommsClientSockets(new NetworkAddress(_host, unavailablePort));
 
-        // Test synchronous connection failure
-        Assert.Throws<SocketException>(() =>
-        {
-            client.Connect(onBroadcastReceived: (msg) => { });
-        }, "Sync connect should throw SocketException when server is unavailable");
+        var connected = client.Connect(onBroadcastReceived: (msg) => { });
+        Assert.That(connected, Is.False, "Client should not connect successfully");
 
-        // Test asynchronous connection failure
-        Assert.ThrowsAsync<SocketException>(async () =>
-        {
-            await client.ConnectAsync(onBroadcastReceived: (msg) => { });
-        }, "Async connect should throw SocketException when server is unavailable");
+        var connectedAsync = await client.ConnectAsync(onBroadcastReceived: (msg) => { });
+        Assert.That(connectedAsync, Is.False, "Client should not connect successfully");
 
         // Ensure disposal doesn't throw even after failed connection
         Assert.DoesNotThrow(() =>

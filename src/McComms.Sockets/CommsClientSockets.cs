@@ -7,7 +7,15 @@
 public class CommsClientSockets : ICommsClient, IDisposable {
     private readonly SocketsClient _client;
 
+    /// <summary>
+    /// Gets the network address of the connected server.
+    /// </summary>
     public NetworkAddress Address => _client.Address;
+
+    /// <summary>
+    /// Gets the communication protocol used by this client.
+    /// </summary>
+    public CommsProtocol Protocol => CommsProtocol.Sockets;
 
     /// <summary>
     /// Initializes a new instance of the CommsClientSockets class with default host and port.
