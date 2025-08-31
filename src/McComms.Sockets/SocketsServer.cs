@@ -10,64 +10,46 @@ namespace McComms.Sockets;
 /// Uses main port for commands and main port + 1 for broadcasts.
 /// </summary>
 public sealed class SocketsServer : IDisposable {
-    /// <summary>
     /// Constants
-    /// </summary>
     public const string DEFAULT_HOST = "127.0.0.1";
     public const int DEFAULT_PORT = 50051;
     public const int DEFAULT_BUFFER_SIZE = 1500;
     public const int DEFAULT_POLL_DELAY_MS = 5;
 
-    /// <summary>
     /// TCP listener socket for accepting incoming command client connections.
-    /// </summary>
     private readonly Socket? _commandListener;
 
-    /// <summary>
     /// TCP listener socket for accepting incoming broadcast client connections (port + 1).
-    /// </summary>
     private readonly Socket? _broadcastListener;
 
-    /// <summary>
     /// Endpoint for the command TCP listener defining the IP address and port to listen on.
-    /// </summary>
     private readonly IPEndPoint? _commandEndPoint = null;
 
-    /// <summary>
     /// Endpoint for the broadcast TCP listener (port + 1).
-    /// </summary>
     private readonly IPEndPoint? _broadcastEndPoint = null;
 
-    /// <summary>
     /// Thread-safe collection of currently connected command clients.
-    /// </summary>
     private readonly ConcurrentDictionary<int, SocketsClientModel> _commandClients = new();
 
-    /// <summary>
     /// Thread-safe collection of currently connected broadcast clients.
-    /// </summary>
     private readonly ConcurrentDictionary<int, SocketsClientModel> _broadcastClients = new();
 
-    /// <summary>
     /// Counter for assigning unique client IDs.
-    /// </summary>
     private int _nextClientId = 1;
 
-    /// <summary>
     /// Callback function for handling received messages from clients.
-    /// </summary>
     private Func<byte[], byte[]>? _onMessageReceived;
 
-    /// <summary>
     /// Poll delay in milliseconds to avoid busy waiting.
-    /// </summary>
     private readonly int _pollDelayMs;
-
-    // The communication host that defines the address and port for the server
-    private readonly NetworkAddress _address = new(DEFAULT_HOST, DEFAULT_PORT);
 
     // Semaphore for message processing synchronization
     private readonly SemaphoreSlim _messageProcessingLock = new(1, 1);
+
+    /// <summary>
+    /// The communication host that defines the address and port for the server.
+    /// </summary>
+    private readonly NetworkAddress _address = new(DEFAULT_HOST, DEFAULT_PORT);
 
     /// <summary>
     /// Gets the network address for the server.

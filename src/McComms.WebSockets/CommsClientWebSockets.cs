@@ -17,6 +17,8 @@ public class CommsClientWebSockets : ICommsClient {
 
     public NetworkAddress Address => throw new NotImplementedException();
 
+    public CommsProtocol Protocol => CommsProtocol.WebSockets;
+
     /// <summary>
     /// Initializes a new instance of the CommsClientWebSockets class with default server address and port.
     /// </summary>

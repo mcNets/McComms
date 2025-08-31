@@ -8,6 +8,9 @@ public class CommsServerWebSockets : ICommsServer {
     private readonly WebSocketsServer _webSocketServer;
     private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
     
+
+    public CommsProtocol Protocol => CommsProtocol.WebSockets;
+    
     /// <summary>
     /// Initializes a new instance of the CommsServerWebSockets class with default host and port.
     /// </summary>
@@ -18,10 +21,9 @@ public class CommsServerWebSockets : ICommsServer {
     /// <summary>
     /// Initializes a new instance of the CommsServerWebSockets class with specified host and port.
     /// </summary>
-    /// <param name="ipAddress">The IP address to listen on.</param>
-    /// <param name="port">The port number to use for the server.</param>
-    public CommsServerWebSockets(IPAddress ipAddress, int port) {
-        _webSocketServer = new WebSocketsServer(ipAddress, port);
+    /// <param name="address">The NetworkAddress to listen on.</param>
+    public CommsServerWebSockets(NetworkAddress address) {
+        _webSocketServer = new WebSocketsServer(address);
     }
 
     /// <summary>
