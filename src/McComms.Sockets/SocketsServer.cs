@@ -11,8 +11,6 @@ namespace McComms.Sockets;
 /// </summary>
 public sealed class SocketsServer : IDisposable {
     /// Constants
-    public const string DEFAULT_HOST = "127.0.0.1";
-    public const int DEFAULT_PORT = 50051;
     public const int DEFAULT_BUFFER_SIZE = 1500;
     public const int DEFAULT_POLL_DELAY_MS = 5;
 
@@ -49,7 +47,7 @@ public sealed class SocketsServer : IDisposable {
     /// <summary>
     /// The communication host that defines the address and port for the server.
     /// </summary>
-    private readonly NetworkAddress _address = new(DEFAULT_HOST, DEFAULT_PORT);
+    private readonly NetworkAddress _address = new(DefaultNetworkSettings.DEFAULT_HOST, DefaultNetworkSettings.DEFAULT_PORT);
 
     /// <summary>
     /// Gets the network address for the server.
@@ -60,7 +58,7 @@ public sealed class SocketsServer : IDisposable {
     /// Initializes a new instance of the SocketsServer class with the specified NetworkAddress
     /// </summary>
     /// <param name="address">The NetworkAddress to listen on.</param>
-    public SocketsServer() : this(new NetworkAddress(DEFAULT_HOST, DEFAULT_PORT)) {
+    public SocketsServer() : this(new NetworkAddress(DefaultNetworkSettings.DEFAULT_HOST, DefaultNetworkSettings.DEFAULT_PORT)) {
     }
 
     /// <summary>

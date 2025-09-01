@@ -7,10 +7,7 @@ namespace McComms.gRPC;
 /// This class handles both sending commands and receiving broadcast messages.
 /// </summary>
 public sealed class GrpcClient : IDisposable, IAsyncDisposable {
-    public const string DEFAULT_HOST = "localhost";
-    public const int DEFAULT_PORT = 50051;
-
-    private readonly NetworkAddress _address = new(DEFAULT_HOST, DEFAULT_PORT);
+    private readonly NetworkAddress _address = new(DefaultNetworkSettings.DEFAULT_HOST, DefaultNetworkSettings.DEFAULT_PORT);
     private readonly Channel? _channel;
     private readonly mcServeis.mcServeisClient _client;
     private readonly CancellationTokenSource _cancellationTokenSource = new();

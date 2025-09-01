@@ -18,11 +18,11 @@
     <PackageId>McComms.WebSockets</PackageId>
     <PackageIcon>mccomms-websockets.png</PackageIcon>
   
-    <Version>1.0.4</Version>
+    <Version>1.0.5</Version>
   </PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="McComms.Core" Version="1.1.0" />
+		<PackageReference Include="McComms.Core" Version="1.1.1" />
 	</ItemGroup>
 
   <ItemGroup>

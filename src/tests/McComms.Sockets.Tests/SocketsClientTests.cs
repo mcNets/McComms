@@ -13,8 +13,8 @@ public class SocketsClientTests
         Assert.Multiple(() =>
         {
             Assert.That(client, Is.Not.Null);
-            Assert.That(client.Address.Host, Is.EqualTo(SocketsClient.DEFAULT_HOST));
-            Assert.That(client.Address.Port, Is.EqualTo(SocketsClient.DEFAULT_PORT));
+            Assert.That(client.Address.Host, Is.EqualTo(DefaultNetworkSettings.DEFAULT_HOST));
+            Assert.That(client.Address.Port, Is.EqualTo(DefaultNetworkSettings.DEFAULT_PORT));
         });
     }
 

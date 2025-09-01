@@ -5,8 +5,6 @@ namespace McComms.WebSockets;
 /// message processing, and broadcasting.
 /// </summary>
 public sealed class WebSocketsServer : IDisposable {
-    private const string DEFAULT_HOST = "127.0.0.1";
-    private const int DEFAULT_PORT = 50051;
     private const int DEFAULT_BUFFER_SIZE = 1024;
     private const int MAX_MESSAGE_SIZE = 10 * 1024 * 1024; // 10MB max message size
 
@@ -47,7 +45,7 @@ public sealed class WebSocketsServer : IDisposable {
     /// <summary>
     /// Initializes a new instance of WebSocketsServer with default host and port.
     /// </summary>
-    public WebSocketsServer() : this(new NetworkAddress(DEFAULT_HOST, DEFAULT_PORT)) { }
+    public WebSocketsServer() : this(new NetworkAddress(DefaultNetworkSettings.DEFAULT_HOST, DefaultNetworkSettings.DEFAULT_PORT)) { }
 
     /// <summary>
     /// Initializes a new instance of WebSocketsServer with specified IP address and port.

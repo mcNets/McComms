@@ -7,11 +7,8 @@ using System.Diagnostics;
 /// This class manages client connections and message distribution.
 /// </summary>
 public sealed class GrpcServer : mcServeis.mcServeisBase {
-    public const string DEFAULT_HOST = "localhost";
-    public const int DEFAULT_PORT = 50051;
-
     private readonly Server? _server;
-    private readonly NetworkAddress _address = new(DEFAULT_HOST, DEFAULT_PORT);
+    private readonly NetworkAddress _address = new(DefaultNetworkSettings.DEFAULT_HOST, DefaultNetworkSettings.DEFAULT_PORT);
     private readonly List<IServerStreamWriter<mcBroadcast>> _broadcastWriters = [];
     private readonly Lock _broadcastWritersLock = new();
 

@@ -16,8 +16,8 @@ public class SocketsServerTests
         Assert.Multiple(() =>
         {
             Assert.That(server, Is.Not.Null);
-            Assert.That(server.Address.Host, Is.EqualTo(SocketsServer.DEFAULT_HOST));
-            Assert.That(server.Address.Port, Is.EqualTo(SocketsServer.DEFAULT_PORT));
+            Assert.That(server.Address.Host, Is.EqualTo(DefaultNetworkSettings.DEFAULT_HOST));
+            Assert.That(server.Address.Port, Is.EqualTo(DefaultNetworkSettings.DEFAULT_PORT));
         });
         server.Dispose();
     }

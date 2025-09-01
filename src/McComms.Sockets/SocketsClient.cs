@@ -9,8 +9,6 @@ namespace McComms.Sockets;
 /// </summary>
 public class SocketsClient : IDisposable {
     // Constants
-    public const string DEFAULT_HOST = "127.0.0.1";
-    public const int DEFAULT_PORT = 50051;
     private const int MAX_BUFFER_SIZE = 1500;
     private const int DEFAULT_POLL_DELAY_MS = 5;
     private const int DEFAULT_READ_TIMEOUT_MS = 10000;
@@ -35,7 +33,7 @@ public class SocketsClient : IDisposable {
     private readonly SemaphoreSlim _sendSemaphore = new(1, 1);
 
     // CommsHost object for host and port information
-    private readonly NetworkAddress _address = new(DEFAULT_HOST, DEFAULT_PORT);
+    private readonly NetworkAddress _address = new(DefaultNetworkSettings.DEFAULT_HOST, DefaultNetworkSettings.DEFAULT_PORT);
 
     // Task and cancellation for async background message listening
     private Task? _broadcastTask;
@@ -66,7 +64,7 @@ public class SocketsClient : IDisposable {
     /// Default constructor. Connects with default settings.
     /// </summary>
     public SocketsClient()
-        : this(new NetworkAddress(DEFAULT_HOST, DEFAULT_PORT), DEFAULT_POLL_DELAY_MS, DEFAULT_READ_TIMEOUT_MS) {
+        : this(new NetworkAddress(DefaultNetworkSettings.DEFAULT_HOST, DefaultNetworkSettings.DEFAULT_PORT), DEFAULT_POLL_DELAY_MS, DEFAULT_READ_TIMEOUT_MS) {
     }
 
     /// <summary>

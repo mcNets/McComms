@@ -15,8 +15,8 @@ public class GrpcClientTests
         Assert.Multiple(() =>
         {
             Assert.That(client, Is.Not.Null);
-            Assert.That(client.Address.Host, Is.EqualTo(GrpcClient.DEFAULT_HOST));
-            Assert.That(client.Address.Port, Is.EqualTo(GrpcClient.DEFAULT_PORT));
+            Assert.That(client.Address.Host, Is.EqualTo(DefaultNetworkSettings.DEFAULT_HOST));
+            Assert.That(client.Address.Port, Is.EqualTo(DefaultNetworkSettings.DEFAULT_PORT));
         });
     }
 
