@@ -18,7 +18,7 @@ public class WebSocketsClient : IDisposable {    private readonly string _server
     /// <summary>
     /// Initializes a new WebSocketsClient with default server host and port.
     /// </summary>
-    public WebSocketsClient() : this(IPAddress.Parse(DefaultNetworkSettings.DEFAULT_HOST), DefaultNetworkSettings.DEFAULT_PORT) { }
+    public WebSocketsClient() : this(IPAddress.Parse(DefaultNetworkSettings.DEFAULT_CLIENT_HOST), DefaultNetworkSettings.DEFAULT_PORT) { }
 
     /// <summary>
     /// Initializes a new WebSocketsClient with the specified server host and port.

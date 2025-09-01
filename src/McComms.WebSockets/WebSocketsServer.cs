@@ -45,7 +45,7 @@ public sealed class WebSocketsServer : IDisposable {
     /// <summary>
     /// Initializes a new instance of WebSocketsServer with default host and port.
     /// </summary>
-    public WebSocketsServer() : this(new NetworkAddress(DefaultNetworkSettings.DEFAULT_HOST, DefaultNetworkSettings.DEFAULT_PORT)) { }
+    public WebSocketsServer() : this(new NetworkAddress(DefaultNetworkSettings.DEFAULT_SERVER_HOST, DefaultNetworkSettings.DEFAULT_PORT)) { }
 
     /// <summary>
     /// Initializes a new instance of WebSocketsServer with specified IP address and port.

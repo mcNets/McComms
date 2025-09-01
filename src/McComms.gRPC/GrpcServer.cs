@@ -8,7 +8,7 @@ using System.Diagnostics;
 /// </summary>
 public sealed class GrpcServer : mcServeis.mcServeisBase {
     private readonly Server? _server;
-    private readonly NetworkAddress _address = new(DefaultNetworkSettings.DEFAULT_HOST, DefaultNetworkSettings.DEFAULT_PORT);
+    private readonly NetworkAddress _address = new(DefaultNetworkSettings.DEFAULT_SERVER_HOST, DefaultNetworkSettings.DEFAULT_PORT);
     private readonly List<IServerStreamWriter<mcBroadcast>> _broadcastWriters = [];
     private readonly Lock _broadcastWritersLock = new();
 

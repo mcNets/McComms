@@ -32,7 +32,7 @@ public class CommsServerGrpcTests
         Assert.Multiple(() =>
         {
             Assert.That(server, Is.Not.Null);
-            Assert.That(server.Address.Host, Is.EqualTo(DefaultNetworkSettings.DEFAULT_HOST));
+            Assert.That(server.Address.Host, Is.EqualTo(DefaultNetworkSettings.DEFAULT_SERVER_HOST));
             Assert.That(server.Address.Port, Is.EqualTo(DefaultNetworkSettings.DEFAULT_PORT));
         });
         server.Stop();
