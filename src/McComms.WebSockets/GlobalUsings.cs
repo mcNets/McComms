@@ -1,4 +1,5 @@
 global using System;
+global using System.Buffers;
 global using System.Net;
 global using System.Net.WebSockets;
 global using System.Text;

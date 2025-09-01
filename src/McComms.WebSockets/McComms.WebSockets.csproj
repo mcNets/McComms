@@ -22,7 +22,7 @@
   </PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="McComms.Core" Version="1.0.9" />
+		<PackageReference Include="McComms.Core" Version="1.1.0" />
 	</ItemGroup>
 
   <ItemGroup>
